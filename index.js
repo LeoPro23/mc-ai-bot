@@ -1,60 +1,88 @@
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
-const { OpenAI } = require('openai')
+const { GoogleGenerativeAI } = require('@google/generative-ai')
 
-// Configuración del Bot
+// 1. Configuración de Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+// Usamos 'gemini-1.5-flash' porque es más rápido para juegos
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+
+// 2. Configuración del Bot
 const bot = mineflayer.createBot({
-  host: process.env.MC_HOST || 'host.docker.internal', 
+  host: process.env.MC_HOST || 'host.docker.internal',
   port: parseInt(process.env.MC_PORT) || 25565,
-  username: process.env.MC_USER || 'POLLOVIS_AI',
-  version: '1.21'
-})
-
-// Configuración de IA
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, 
-  // baseURL: 'https://api.deepseek.com' // Descomenta si usas DeepSeek
+  username: process.env.MC_USER || 'POLLOVIS',
+  version: '1.21.4'
 })
 
 bot.loadPlugin(pathfinder)
 
+// Movimientos básicos
 bot.on('spawn', () => {
-  console.log('¡POLLOVIS ha aterrizado en el servidor!')
+  console.log('¡POLLOVIS ha aterrizado!')
   const mcData = require('minecraft-data')(bot.version)
   const defaultMove = new Movements(bot, mcData)
+  
+  // Ajustes para que no se rompa las piernas o se quede atascado
+  defaultMove.canDig = true
+  defaultMove.allow1by1towers = false 
   bot.pathfinder.setMovements(defaultMove)
 })
 
 bot.on('chat', async (username, message) => {
   if (username === bot.username) return
-  
-  // Si le hablan al bot
-  if (message.toLowerCase().includes(bot.username.toLowerCase())) {
-    const prompt = `Eres un asistente en Minecraft llamado POLLOVIS. 
-    El jugador ${username} te dijo: "${message}".
-    Responde corto. Si te piden ir a un lugar, responde SOLO con: #GOTO x y z`
+
+  // Solo responde si mencionan su nombre para ahorrar recursos
+  if (message.toLowerCase().includes(bot.username.toLowerCase()) || message.includes('POLLOVIS')) {
+    
+    // Obtenemos la posición actual para que el bot tenga contexto
+    const p = bot.entity.position
+    const myPos = `x:${Math.floor(p.x)} y:${Math.floor(p.y)} z:${Math.floor(p.z)}`
+
+    const prompt = `
+      Actúa como un asistente útil en Minecraft llamado POLLOVIS.
+      El jugador ${username} te dijo: "${message}".
+      Tu ubicación actual es: ${myPos}.
+      
+      REGLAS DE RESPUESTA:
+      1. Responde de forma breve y con personalidad de mayordomo servicial.
+      2. Si te piden ir a unas coordenadas, responde ESTRICTAMENTE con este formato al final: #GOTO x y z
+      3. Si te piden venir a donde está el jugador, responde pidiendo sus coordenadas, ya que no puedes verlas por magia.
+      4. No uses markdown ni emojis excesivos, usa texto plano de Minecraft.
+    `
 
     try {
-      const completion = await openai.chat.completions.create({
-        messages: [{ role: 'system', content: prompt }],
-        model: 'gpt-3.5-turbo', // O el modelo que prefieras
-      })
-
-      const reply = completion.choices[0].message.content
+      const result = await model.generateContent(prompt)
+      const response = result.response.text()
       
-      // Lógica simple de comandos
-      if (reply.includes('#GOTO')) {
-        const args = reply.split(' ')
-        const x = parseFloat(args[1])
-        const y = parseFloat(args[2])
-        const z = parseFloat(args[3])
-        bot.chat(`Entendido, voy a ${x} ${y} ${z}`)
-        bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
+      console.log(`Gemini dice: ${response}`) // Log para depurar en Easypanel
+
+      // Lógica para detectar comandos de movimiento
+      if (response.includes('#GOTO')) {
+        // Extraemos las coordenadas del texto
+        const match = response.match(/#GOTO\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
+        if (match) {
+          const x = parseInt(match[1])
+          const y = parseInt(match[2])
+          const z = parseInt(match[3])
+          
+          // Limpiamos el mensaje para el chat (quitamos el comando feo)
+          const chatMsg = response.replace(/#GOTO.*/, '').trim()
+          if(chatMsg) bot.chat(chatMsg)
+          
+          bot.chat(`Voy hacia ${x} ${y} ${z}`)
+          bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
+        } else {
+            bot.chat(response)
+        }
       } else {
-        bot.chat(reply)
+        // Respuesta normal de conversación
+        bot.chat(response)
       }
+
     } catch (e) {
-      console.error(e)
+      console.error("Error con Gemini:", e)
+      bot.chat("Lo siento señor, me he mareado un poco (Error de API).")
     }
   }
 })
