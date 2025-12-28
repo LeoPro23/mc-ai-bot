@@ -1,159 +1,30 @@
 const mineflayer = require('mineflayer')
-require('dotenv').config() // Cargar variables de entorno .env
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
-const toolPlugin = require('mineflayer-tool').plugin // IMPORTANTE: Cargar el plugin
-const { GoogleGenerativeAI } = require('@google/generative-ai')
-const http = require('http')
-const Vec3 = require('vec3')
+const toolPlugin = require('mineflayer-tool').plugin
+const { MC_HOST, MC_PORT, MC_USER, MC_AUTH_PASS, MAX_HISTORY } = require('./src/config')
+const { startWebServer } = require('./src/web')
+const { escanearEntorno } = require('./src/vision')
+const { irYRomper } = require('./src/actions')
+const { initAI, generateResponse } = require('./src/ai')
 
-console.log('--- INICIANDO SISTEMA POLLOVIS 5.1 (MINERO PRO) ---')
+console.log('--- INICIANDO SISTEMA POLLOVIS 5.2 (MODULAR) ---')
 
-// --- 1. CONFIGURACIÓN ---
-const MODELO_A_USAR = 'gemini-2.0-flash-lite-preview-02-05' 
-
-// Historial de conversación (15 mensajes)
+// Historial de conversación
 const chatHistory = []
-const MAX_HISTORY = 15
 
-// --- 2. SERVIDOR WEB ---
-const webServer = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end(`Bot Pollovis ONLINE. Modelo: ${MODELO_A_USAR}`)
-})
-webServer.listen(8080, '0.0.0.0', () => console.log('✅ Web Server OK (8080)'))
+// Iniciar servidor web
+startWebServer()
 
-// --- 3. IA ---
-let model = null
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+// Iniciar IA
+initAI()
 
-// FUNCIÓN DE DIAGNÓSTICO PARA LISTAR MODELOS
-async function listarModelos() {
-    try {
-        console.log("🔍 Buscando modelos disponibles...");
-        // Hack para listar modelos usando fetch directo ya que el SDK a veces oculta esto
-        const key = process.env.GEMINI_API_KEY;
-        if (!key) return console.log("❌ No hay API KEY");
-        
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-        const data = await response.json();
-        
-        if (data.models) {
-            console.log("✅ Modelos encontrados:");
-            data.models.forEach(m => {
-                if (m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')) {
-                    console.log(`   - ${m.name.replace('models/', '')}`);
-                }
-            });
-        }
-    } catch (e) {
-        console.log("⚠️ No se pudieron listar los modelos:", e.message);
-    }
-}
-
-// Ejecutar diagnóstico antes de configurar el modelo
-// listarModelos();
-
-try {
-    model = genAI.getGenerativeModel({ model: MODELO_A_USAR })
-    console.log(`✅ IA Lista: ${MODELO_A_USAR}`)
-} catch (e) { console.error('❌ Error IA:', e) }
-
-// --- 4. FUNCIONES DE VISIÓN ---
-function escanearEntorno(bot) {
-    const entidades = Object.values(bot.entities)
-        .filter(e => e.position.distanceTo(bot.entity.position) < 10 && e.username !== bot.username)
-        .map(e => {
-            if (e.type === 'player') return `Jugador: ${e.username}`
-            if (e.type === 'mob') return `Mob: ${e.name}`
-            return null
-        }).filter(Boolean).slice(0, 5)
-
-    // 1. Bloques de Navegación (Prioridad Alta: Escaleras y Puertas)
-    const bloquesNavegacion = bot.findBlocks({
-        matching: (block) => {
-            return block && (
-                block.name.includes('ladder') || 
-                block.name.includes('stairs') ||
-                block.name.includes('door') ||
-                block.name.includes('gate')
-            )
-        },
-        maxDistance: 32,
-        count: 100 // ¡Aumentado para ver escaleras largas completas!
-    })
-
-    // 2. Bloques de Interés (Recursos)
-    const bloquesRecursos = bot.findBlocks({
-        matching: (block) => {
-            return block && (
-                block.name.includes('chest') || 
-                block.name.includes('bed') || 
-                block.name.includes('log') || 
-                block.name.includes('ore') || 
-                block.name.includes('diamond') ||
-                block.name.includes('plank')
-            )
-        },
-        maxDistance: 16, // Menos rango para no saturar
-        count: 20
-    })
-    
-    const todosLosBloques = [...bloquesNavegacion, ...bloquesRecursos]
-
-    const nombresBloques = todosLosBloques.map(pos => {
-        const b = bot.blockAt(pos)
-        let nombre = b.name
-        if (nombre.includes('ladder')) nombre = 'ESCALERA_MANO (ladder)'
-        if (nombre.includes('stairs')) nombre = 'ESCALON (stairs)'
-        return `${nombre} en ${pos.x},${pos.y},${pos.z}`
-    })
-
-    let vision = ""
-    if (entidades.length > 0) vision += `Entidades: ${entidades.join(', ')}. `
-    if (nombresBloques.length > 0) vision += `Bloques: ${nombresBloques.join(', ')}. `
-    if (vision === "") vision = "No veo nada relevante cerca."
-    
-    return vision
-}
-
-// --- 5. FUNCIÓN DE MINERÍA MEJORADA ---
-async function irYRomper(bot, x, y, z) {
-    const targetBlock = bot.blockAt(new Vec3(x, y, z))
-    if (!targetBlock) {
-        bot.chat("No veo ese bloque.")
-        return
-    }
-
-    bot.chat(`Voy a por ${targetBlock.name}...`)
-    
-    try {
-        // 1. Ir hacia el bloque (Respetando canDig = false, osea sin romper paredes)
-        await bot.pathfinder.goto(new goals.GoalLookAtBlock(new Vec3(x, y, z), bot.world))
-        
-        // 2. Equipar herramienta (Gracias a mineflayer-tool)
-        try {
-            await bot.tool.equipForBlock(targetBlock, {}) 
-        } catch (err) {
-            console.log("No tengo herramienta óptima, usaré la mano.")
-        }
-
-        // 3. Romper
-        await bot.dig(targetBlock)
-        bot.chat("¡Roto!")
-    } catch (err) {
-        bot.chat("No pude llegar o romperlo.")
-        console.error(err)
-    }
-}
-
-// --- 6. BOT MINECRAFT ---
 function initBot() {
   console.log(`🔄 Conectando...`)
 
   const bot = mineflayer.createBot({
-    host: process.env.MC_HOST,
-    port: parseInt(process.env.MC_PORT) || 25565,
-    username: process.env.MC_USER || 'POLLOVIS',
+    host: MC_HOST,
+    port: MC_PORT,
+    username: MC_USER,
     version: '1.21.4',
     auth: 'offline',
     checkTimeoutInterval: 60000 
@@ -161,11 +32,11 @@ function initBot() {
 
   // CARGAR PLUGINS
   bot.loadPlugin(pathfinder)
-  bot.loadPlugin(toolPlugin) // <--- Cargamos el plugin de herramientas
+  bot.loadPlugin(toolPlugin)
 
   bot.once('spawn', () => {
     console.log(`🚀 ${bot.username} conectado.`)
-    bot.chat(`/login ${process.env.MC_AUTH_PASS}`)
+    if (MC_AUTH_PASS) bot.chat(`/login ${MC_AUTH_PASS}`)
     
     try {
         const mcData = require('minecraft-data')(bot.version)
@@ -190,7 +61,6 @@ function initBot() {
   })
 
   async function procesarMensaje(usuario, mensaje, fuente) {
-    if (!model) return
     if (usuario === bot.username) return
     
     // FILTRO ESTRICTO: Solo SrLeonardo
@@ -246,8 +116,7 @@ function initBot() {
         `
 
         try {
-            const result = await model.generateContent(prompt)
-            const response = result.response.text()
+            const response = await generateResponse(prompt)
             console.log(`💬 Gemini: ${response}`)
 
             chatHistory.push(`Pollovis: ${response.replace(/#.*/, '').trim()}`)
@@ -281,7 +150,7 @@ function initBot() {
     }
   }
 
-  // EVENTOS (Mismo filtro que validamos antes)
+  // EVENTOS
   bot.on('chat', (u, m) => procesarMensaje(u, m, 'chat'))
   bot.on('whisper', (u, m) => procesarMensaje(u, m, 'whisper'))
   bot.on('messagestr', (msg) => {
