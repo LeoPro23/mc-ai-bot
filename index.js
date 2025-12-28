@@ -1,3 +1,4 @@
+// index.js
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoogleGenerativeAI } = require('@google/generative-ai')
@@ -5,15 +6,15 @@ const http = require('http')
 
 console.log('--- INICIANDO SCRIPT DEL BOT ---')
 
-// --- 1. SERVIDOR WEB INMORTAL (CORREGIDO) ---
+// --- 1. SERVIDOR WEB INMORTAL ---
 const webServer = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('Bot Pollovis: ONLINE. Estado: Ejecutandose.')
+  res.end('Bot Pollovis: ONLINE en puerto 8080.')
 })
 
-// IMPORTANTE: '0.0.0.0' permite que Easypanel vea el puerto desde fuera
-webServer.listen(3000, '0.0.0.0', () => {
-  console.log('✅ Servidor web escuchando en puerto 3000 (0.0.0.0)')
+// CAMBIO: Usamos 8080 en lugar de 3000
+webServer.listen(8080, '0.0.0.0', () => {
+  console.log('✅ Servidor web escuchando en puerto 8080')
 })
 
 // --- 2. VALIDACIÓN DE VARIABLES ---
