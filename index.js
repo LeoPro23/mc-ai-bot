@@ -25,6 +25,34 @@ webServer.listen(8080, '0.0.0.0', () => console.log('✅ Web Server OK (8080)'))
 // --- 3. IA ---
 let model = null
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+
+// FUNCIÓN DE DIAGNÓSTICO PARA LISTAR MODELOS
+async function listarModelos() {
+    try {
+        console.log("🔍 Buscando modelos disponibles...");
+        // Hack para listar modelos usando fetch directo ya que el SDK a veces oculta esto
+        const key = process.env.GEMINI_API_KEY;
+        if (!key) return console.log("❌ No hay API KEY");
+        
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+        const data = await response.json();
+        
+        if (data.models) {
+            console.log("✅ Modelos encontrados:");
+            data.models.forEach(m => {
+                if (m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')) {
+                    console.log(`   - ${m.name.replace('models/', '')}`);
+                }
+            });
+        }
+    } catch (e) {
+        console.log("⚠️ No se pudieron listar los modelos:", e.message);
+    }
+}
+
+// Ejecutar diagnóstico antes de configurar el modelo
+listarModelos();
+
 try {
     model = genAI.getGenerativeModel({ model: MODELO_A_USAR })
     console.log(`✅ IA Lista: ${MODELO_A_USAR}`)
