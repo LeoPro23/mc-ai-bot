@@ -68,25 +68,39 @@ function escanearEntorno(bot) {
             return null
         }).filter(Boolean).slice(0, 5)
 
-    const bloquesInteresantes = bot.findBlocks({
+    // 1. Bloques de Navegación (Prioridad Alta: Escaleras y Puertas)
+    const bloquesNavegacion = bot.findBlocks({
+        matching: (block) => {
+            return block && (
+                block.name.includes('ladder') || 
+                block.name.includes('stairs') ||
+                block.name.includes('door') ||
+                block.name.includes('gate')
+            )
+        },
+        maxDistance: 32,
+        count: 100 // ¡Aumentado para ver escaleras largas completas!
+    })
+
+    // 2. Bloques de Interés (Recursos)
+    const bloquesRecursos = bot.findBlocks({
         matching: (block) => {
             return block && (
                 block.name.includes('chest') || 
                 block.name.includes('bed') || 
-                block.name.includes('door') ||
                 block.name.includes('log') || 
                 block.name.includes('ore') || 
                 block.name.includes('diamond') ||
-                block.name.includes('plank') ||
-                block.name.includes('ladder') ||
-                block.name.includes('stairs')
+                block.name.includes('plank')
             )
         },
-        maxDistance: 32,
-        count: 50
+        maxDistance: 16, // Menos rango para no saturar
+        count: 20
     })
     
-    const nombresBloques = bloquesInteresantes.map(pos => {
+    const todosLosBloques = [...bloquesNavegacion, ...bloquesRecursos]
+
+    const nombresBloques = todosLosBloques.map(pos => {
         const b = bot.blockAt(pos)
         let nombre = b.name
         if (nombre.includes('ladder')) nombre = 'ESCALERA_MANO (ladder)'
