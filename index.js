@@ -1,3 +1,4 @@
+// index.js
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoogleGenerativeAI } = require('@google/generative-ai')

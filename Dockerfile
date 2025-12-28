@@ -1,4 +1,5 @@
-FROM node:20-alpine
+# Dockerfile
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -7,4 +8,4 @@ RUN npm install
 
 COPY . .
 
-CMD ["npm", "start"]
+CMD ["node", "index.js"]
