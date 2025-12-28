@@ -62,8 +62,9 @@ function initBot() {
     }
   })
 
+  // --- CEREBRO IA ---
   bot.on('chat', async (username, message) => {
-    if (username === bot.username || username !== 'SrLeonardo') return
+    if (username === bot.username || username !== '[Dueño] SrLeonardo') return
     if (!model) return
 
     if (message.toLowerCase().includes('pollo') || message.toLowerCase().includes(bot.username.toLowerCase())) {
