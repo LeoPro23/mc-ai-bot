@@ -1,4 +1,5 @@
 const mineflayer = require('mineflayer')
+require('dotenv').config() // Cargar variables de entorno .env
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const toolPlugin = require('mineflayer-tool').plugin // IMPORTANTE: Cargar el plugin
 const { GoogleGenerativeAI } = require('@google/generative-ai')
@@ -8,7 +9,7 @@ const Vec3 = require('vec3')
 console.log('--- INICIANDO SISTEMA POLLOVIS 5.1 (MINERO PRO) ---')
 
 // --- 1. CONFIGURACIÓN ---
-const MODELO_A_USAR = 'gemini-1.5-flash-latest' 
+const MODELO_A_USAR = 'gemini-1.5-flash-001' 
 
 // Historial de conversación (15 mensajes)
 const chatHistory = []
