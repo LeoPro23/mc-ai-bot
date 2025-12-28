@@ -9,7 +9,7 @@ const Vec3 = require('vec3')
 console.log('--- INICIANDO SISTEMA POLLOVIS 5.1 (MINERO PRO) ---')
 
 // --- 1. CONFIGURACIÓN ---
-const MODELO_A_USAR = 'gemini-2.0-flash-exp' 
+const MODELO_A_USAR = 'gemini-2.0-flash-lite-preview-02-05' 
 
 // Historial de conversación (15 mensajes)
 const chatHistory = []
