@@ -33,16 +33,21 @@ async function initAI() {
 async function generateResponse(prompt) {
     if (isOllama) {
         try {
+            // Separamos las instrucciones del contenido para que la IA no se confunda
+            const systemPrompt = "Eres POLLOVIS, un pollo-bot de Minecraft. Responde SIEMPRE en una sola línea, muy corto y directo. Usa #GOTO x y z para moverte o #MINE x y z para minar. Si te piden un comando de chat como /tpa, escríbelo tal cual."
+            
             const response = await fetch(`${OLLAMA_URL}/api/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model: OLLAMA_MODEL,
+                    system: systemPrompt,
                     prompt: prompt,
-                    stream: false, // Importante: respuesta completa de una vez
+                    stream: false,
                     options: {
-                        temperature: 0.1, // Más preciso para comandos
-                        num_predict: 150  // Respuestas cortas
+                        temperature: 0.1,
+                        num_predict: 50, // Limitamos aún más la salida para ganar velocidad
+                        top_p: 0.9
                     }
                 })
             })

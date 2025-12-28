@@ -99,26 +99,14 @@ function initBot() {
         if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
 
         const prompt = `
-          Eres POLLOVIS, un asistente útil en Minecraft.
-          Pos: ${botPos}. Dueño: ${infoDueño}.
-          (NOTA: Y es la altura. Si el dueño está ARRIBA, busca una ESCALERA_MANO y ve a su coordenada más alta).
-          VISION: ${entorno}
-          MEMORIA: ${chatHistory.join('\n')}
+          ESTADO:
+          - Mi Pos: ${botPos}
+          - Dueño: ${infoDueño}
+          - Vision: ${entorno}
+          - Memoria: ${chatHistory.join(' | ')}
           
-          CAPACIDADES:
-          - Puedes MOVERTE (#GOTO).
-          - Puedes ROMPER bloques (#MINE).
-          - NO PUEDES colocar bloques, ni construir, ni abrir cofres.
-
-          REGLAS ESTRICTAS:
-          1. SOLO usa #MINE si la orden es explícita ("rompe", "pica", "tala", "mina").
-          2. Si preguntan "¿qué hay?" o "¿qué ves?", SOLO describe la VISION. NUNCA rompas nada.
-          3. Si te piden hacer algo que no puedes (como poner bloques), di "No sé construir".
-          4. Si te regañan, pide perdón y no hagas nada físico.
-          5. Si te piden un COMANDO (/tpa, /home), escribe el comando tal cual (ej: "/tpa SrLeonardo"). NO uses #.
-          6. RESPONDE SIEMPRE EN UNA SOLA LÍNEA. Usa comas, no listas verticales.
-          
-          Mensaje nuevo: "${mensaje}"
+          MENSAJE DE SRLEONARDO: "${mensaje}"
+          RESPUESTA CORTA:
         `
 
         try {
