@@ -1,77 +1,94 @@
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoogleGenerativeAI } = require('@google/generative-ai')
+const http = require('http') // Necesario para Easypanel
+
+// --- TRUCO PARA EASYPANEL (Mantiene el bot en verde) ---
+// Easypanel necesita detectar que la app está "viva" en un puerto.
+const webServer = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' })
+  res.end('Bot Pollovis: ONLINE y funcionando')
+})
+// Easypanel suele usar el puerto 3000 por defecto para chequear salud
+webServer.listen(3000, () => {
+  console.log('Servidor web de salud iniciado en puerto 3000')
+})
+// -------------------------------------------------------
 
 // 1. Configuración de Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
-// 2. Configuración del Bot POLLOVIS
+// 2. Configuración del Bot
 const bot = mineflayer.createBot({
-  host: process.env.MC_HOST || 'host.docker.internal',
+  host: process.env.MC_HOST, // Recuerda: sin http://
   port: parseInt(process.env.MC_PORT) || 25565,
   username: process.env.MC_USER || 'POLLOVIS',
-  version: '1.21.4' 
+  version: '1.21.4'
 })
 
 bot.loadPlugin(pathfinder)
 
-// Movimientos básicos al nacer
+// Configuración inicial
 bot.on('spawn', () => {
-  console.log(`¡${bot.username} ha aterrizado en 1.21.4!`)
+  console.log(`¡${bot.username} ha entrado al servidor correctamente!`)
   const mcData = require('minecraft-data')(bot.version)
   const defaultMove = new Movements(bot, mcData)
   
-  // Ajustes de movilidad
   defaultMove.canDig = true
   defaultMove.allow1by1towers = false 
   bot.pathfinder.setMovements(defaultMove)
 })
 
 bot.on('chat', async (username, message) => {
+  // Ignorar mensajes del propio bot
   if (username === bot.username) return
 
-  // Detectar si le hablan a POLLOVIS
-  if (message.toLowerCase().includes(bot.username.toLowerCase()) || message.toLowerCase().includes('pollo')) {
+  // --- FILTRO DE DUEÑO ---
+  // Solo permite pasar si el usuario es EXACTAMENTE 'SrLeonardo'
+  if (username !== 'SrLeonardo') {
+    console.log(`Ignorando orden de ${username} (No es el dueño)`)
+    return
+  }
+
+  // Detectar si mencionan al bot (Opcional, ya que solo el dueño le habla, 
+  // pero es bueno mantenerlo por si hablas con otros jugadores en el chat)
+  if (message.toLowerCase().includes('pollo') || message.toLowerCase().includes(bot.username.toLowerCase())) {
     
-    // --- LÓGICA DE VISIÓN ---
-    // Detectamos dónde está el bot
+    // Datos de posición
     const p = bot.entity.position
     const botPos = `x:${Math.floor(p.x)} y:${Math.floor(p.y)} z:${Math.floor(p.z)}`
 
-    // Detectamos dónde está el JUGADOR que habla (si está cerca)
+    // Buscar al dueño visualmente
     const target = bot.players[username] ? bot.players[username].entity : null
-    let playerInfo = "No ves al jugador (está muy lejos)."
+    let playerInfo = "No te veo visualmente (estás lejos o fuera de render)."
     
     if (target) {
-        playerInfo = `El jugador está visible en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}`
+        playerInfo = `Te veo en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}`
     }
 
-    // --- CEREBRO GEMINI ---
     const prompt = `
-      Eres POLLOVIS, un asistente inteligente en Minecraft server 1.21.4.
+      Eres POLLOVIS, el asistente personal de SrLeonardo (Rango Dueño) en Minecraft.
       
-      CONTEXTO ACTUAL:
+      CONTEXTO:
       - Tu posición: ${botPos}
-      - El jugador "${username}" te dice: "${message}"
-      - Información visual: ${playerInfo}
+      - SrLeonardo te dice: "${message}"
+      - Info visual de SrLeonardo: ${playerInfo}
       
-      REGLAS OBLIGATORIAS:
-      1. Tu personalidad: Eres leal, un poco gracioso y eficiente.
-      2. COMANDOS DE MOVIMIENTO:
-         - Si el jugador te pide ir a su lado ("ven", "sígueme", "aquí estoy"), usa sus coordenadas del contexto visual.
-         - Para moverte, DEBES terminar tu frase con: #GOTO x y z
-      3. Si el jugador está lejos y no ves sus coordenadas, pídeselas.
-      4. Respuestas cortas (máximo 1 oración de texto + el comando).
+      INSTRUCCIONES:
+      1. Obedece SOLO a SrLeonardo. Eres extremadamente leal.
+      2. Si te pide ir a su lado ("ven", "aquí"), usa sus coordenadas visuales si las tienes.
+      3. Para moverte, finaliza tu respuesta con: #GOTO x y z
+      4. Si no ves sus coordenadas, pídele que te las diga por chat.
+      5. Responde corto y servicial.
     `
 
     try {
       const result = await model.generateContent(prompt)
       const response = result.response.text()
       
-      console.log(`POLLOVIS PENSÓ: ${response}`) 
+      console.log(`POLLOVIS responde a SrLeonardo: ${response}`)
 
-      // Ejecución de comandos
       if (response.includes('#GOTO')) {
         const match = response.match(/#GOTO\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
         if (match) {
@@ -79,14 +96,12 @@ bot.on('chat', async (username, message) => {
           const y = parseInt(match[2])
           const z = parseInt(match[3])
           
-          // Decir la parte de texto (limpiando el comando técnico)
           const chatMsg = response.replace(/#GOTO.*/, '').trim()
           if(chatMsg) bot.chat(chatMsg)
           
-          // Moverse
           bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
         } else {
-            bot.chat(response) // Fallo al parsear, solo habla
+            bot.chat(response)
         }
       } else {
         bot.chat(response)
@@ -94,10 +109,12 @@ bot.on('chat', async (username, message) => {
 
     } catch (e) {
       console.error("Error Gemini:", e)
+      bot.chat("Jefe, tuve un error mental (API Error).")
     }
   }
 })
 
-// Logs de error para depurar en Easypanel
-bot.on('kicked', console.log)
-bot.on('error', console.log)
+// Logs importantes para ver errores en Easypanel
+bot.on('kicked', (reason) => console.log('Fui expulsado por:', reason))
+bot.on('error', (err) => console.log('Error de conexión:', err))
+bot.on('end', () => console.log('El bot se desconectó.'))
