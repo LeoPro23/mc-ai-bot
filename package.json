@@ -8,8 +8,8 @@
   "dependencies": {
     "mineflayer": "latest",
     "mineflayer-pathfinder": "latest",
-    "minecraft-data": "latest", 
+    "minecraft-data": "latest",
     "dotenv": "latest",
-    "@google/generative-ai": "latest"
+    "@google/generative-ai": "^0.11.0" 
   }
 }

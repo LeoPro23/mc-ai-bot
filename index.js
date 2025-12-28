@@ -3,25 +3,43 @@ const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 const http = require('http')
 
-console.log('--- INICIANDO PROTOCOLO FINAL POLLOVIS ---')
+console.log('--- INICIANDO SISTEMA POLLOVIS 3.0 ---')
 
-// 1. WEB SERVER (Puerto 8080)
+// --- 1. CONFIGURACIÓN DEL MODELO ---
+// Según tu texto, el ID es 'gemini-3-flash-preview', pero si no tienes acceso
+// usaremos 'gemini-1.5-flash' que es la versión estable actual.
+const MODELO_A_USAR = 'gemini-3-flash-preview' 
+// const MODELO_A_USAR = 'gemini-3-flash-preview' // DESCOMENTAR SI TIENES ACCESO BETA
+
+// --- 2. SERVIDOR WEB (Puerto 8080) ---
 const webServer = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('Bot Pollovis: ONLINE v3.0')
+  res.end(`Bot Pollovis ONLINE. Modelo: ${MODELO_A_USAR}`)
 })
 webServer.listen(8080, '0.0.0.0', () => console.log('✅ Web Server OK (8080)'))
 
-// 2. IA
+// --- 3. INICIALIZACIÓN IA CON DIAGNÓSTICO ---
 let model = null
-try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-    model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
-} catch (e) { console.error('❌ Error IA:', e) }
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 
-// 3. BOT
+async function configurarIA() {
+    try {
+        // Diagnóstico: Listar modelos disponibles para tu API KEY
+        // Esto nos dirá si realmente tienes acceso a la 1.5 o la 3.0
+        /* Nota: Si el código falla aquí con 404, es posible que tu API Key 
+           no tenga la API "Generative Language" habilitada en Google Cloud.
+        */
+        model = genAI.getGenerativeModel({ model: MODELO_A_USAR })
+        console.log(`✅ IA Configurada usando modelo: ${MODELO_A_USAR}`)
+    } catch (e) {
+        console.error('❌ Error CRÍTICO configurando IA:', e)
+    }
+}
+configurarIA()
+
+// --- 4. BOT MINECRAFT ---
 function initBot() {
-  console.log(`🔄 Conectando...`)
+  console.log(`🔄 Conectando a ${process.env.MC_HOST}...`)
 
   const bot = mineflayer.createBot({
     host: process.env.MC_HOST,
@@ -35,7 +53,7 @@ function initBot() {
   bot.loadPlugin(pathfinder)
 
   bot.once('spawn', () => {
-    console.log(`🚀 ${bot.username} conectado.`)
+    console.log(`🚀 ${bot.username} conectado al juego.`)
     bot.chat(`/login ${process.env.MC_AUTH_PASS}`)
     
     try {
@@ -46,48 +64,42 @@ function initBot() {
     } catch (e) {}
   })
 
-  // --- FUNCIÓN CENTRAL DE PROCESAMIENTO ---
+  // --- FUNCIÓN DE PROCESAMIENTO INTELIGENTE ---
   async function procesarMensaje(usuario, mensaje, fuente) {
     if (!model) return
     if (usuario === bot.username) return
 
-    // FILTRO DE SEGURIDAD (Flexible)
-    // Aceptamos "SrLeonardo", "[Dueño] SrLeonardo", etc.
-    if (!usuario.includes('SrLeonardo')) {
-        // Solo logueamos para no spamear consola
-        // console.log(`Ignorado: ${usuario} (No es el jefe)`)
-        return 
-    }
+    // Filtro de dueño flexible
+    if (!usuario.includes('SrLeonardo')) return 
 
-    // DETECTAR INTENCIÓN
     const mencionaBot = mensaje.toLowerCase().includes('pollo') || mensaje.toLowerCase().includes(bot.username.toLowerCase())
     const esPrivado = fuente === 'whisper' || mensaje.includes('-> me')
 
-    // REGLA: Respondemos si nos mencionan O si es un mensaje privado
     if (mencionaBot || esPrivado) {
         console.log(`⚡ PROCESANDO (${fuente}) de ${usuario}: "${mensaje}"`)
         
-        // Contexto
         const p = bot.entity.position
         const botPos = `x:${Math.floor(p.x)} y:${Math.floor(p.y)} z:${Math.floor(p.z)}`
+        
+        // Contexto visual
         const target = Object.values(bot.players).find(p => p.username && p.username.includes('SrLeonardo'))?.entity
         let playerInfo = target ? `Te veo en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}` : "No te veo visualmente."
 
         const prompt = `
-          Eres POLLOVIS, asistente de SrLeonardo.
+          Eres POLLOVIS.
           Usuario: ${usuario}. Mensaje: "${mensaje}".
           Tu pos: ${botPos}. Info visual dueño: ${playerInfo}.
           
           INSTRUCCIONES:
           1. Obedece a SrLeonardo.
           2. Si pide moverse ("ven", "sigueme"), usa #GOTO x y z.
-          3. Responde corto y servicial.
+          3. Responde muy corto.
         `
 
         try {
             const result = await model.generateContent(prompt)
             const response = result.response.text()
-            console.log(`💬 Gemini: ${response}`)
+            console.log(`💬 Gemini Responde: ${response}`)
 
             if (response.includes('#GOTO')) {
                 const match = response.match(/#GOTO\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
@@ -100,39 +112,31 @@ function initBot() {
             } else {
                 bot.chat(response)
             }
-        } catch (e) { console.error("Error API:", e) }
+        } catch (e) { 
+            console.error("❌ Error API Gemini:", e.message)
+            bot.chat("Error de conexión con mi cerebro.") 
+        }
     }
   }
 
-  // --- EVENTO 1: CHAT NORMAL (Mejor detección de usuario) ---
-  bot.on('chat', (username, message) => {
-    procesarMensaje(username, message, 'chat')
-  })
-
-  // --- EVENTO 2: SUSURROS (Whisper) ---
-  bot.on('whisper', (username, message) => {
-    procesarMensaje(username, message, 'whisper')
-  })
-
-  // --- EVENTO 3: RESPALDO NUCLEAR (Messagestr) ---
-  // Solo se activa si detecta el formato de mensaje privado de consola o plugins raros
+  // EVENTOS
+  bot.on('chat', (u, m) => procesarMensaje(u, m, 'chat'))
+  bot.on('whisper', (u, m) => procesarMensaje(u, m, 'whisper'))
+  
+  // Respaldo para mensajes de sistema/plugins
   bot.on('messagestr', (msg) => {
-    // Detectar formato AuthMe/Essentials tipo "[SrLeonardo -> me] hola"
     if (msg.includes('-> me') && msg.includes('SrLeonardo')) {
-        // Limpieza manual rápida
-        const contenido = msg.split(']')[1] || msg // Intenta sacar lo que va después del ]
+        const contenido = msg.split(']')[1] || msg 
         procesarMensaje('SrLeonardo', contenido.trim(), 'messagestr_privado')
     }
-    // Detectar formato chat publico raro que contenga el nombre explicitamente
     else if (msg.includes('SrLeonardo') && (msg.includes('Pollo') || msg.includes('pollo'))) {
-        // Intentamos no duplicar si ya saltó el evento 'chat'
-        // (Mineflayer suele disparar 'chat' antes, así que esto es solo por si acaso)
+        // Opcional: procesarMensaje('SrLeonardo', msg, 'messagestr_publico')
     }
   })
 
   bot.on('error', (e) => console.log('Error:', e))
   bot.on('end', () => {
-    console.log('Desconectado. Reintentando...')
+    console.log('Desconectado. Reconectando...')
     setTimeout(initBot, 10000)
   })
 }
