@@ -9,7 +9,7 @@ const Vec3 = require('vec3')
 console.log('--- INICIANDO SISTEMA POLLOVIS 5.1 (MINERO PRO) ---')
 
 // --- 1. CONFIGURACIÓN ---
-const MODELO_A_USAR = 'gemini-2.5-flash-lite' 
+const MODELO_A_USAR = 'gemini-pro' 
 
 // Historial de conversación (15 mensajes)
 const chatHistory = []
@@ -197,7 +197,7 @@ function initBot() {
 
             // Lógica de Comandos
             if (response.includes('#GOTO')) {
-                const match = response.match(/#GOTO\s+(-?\d+)[,\s]+(-?\d+)[,\s]+(-?\d+)/)
+                const match = response.match(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
                     const chatMsg = response.replace(/#GOTO.*/, '').trim()
@@ -206,7 +206,7 @@ function initBot() {
                 }
             } 
             else if (response.includes('#MINE')) {
-                const match = response.match(/#MINE\s+(-?\d+)[,\s]+(-?\d+)[,\s]+(-?\d+)/)
+                const match = response.match(/#MINE\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
                     const chatMsg = response.replace(/#MINE.*/, '').trim()
