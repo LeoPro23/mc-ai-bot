@@ -158,9 +158,18 @@ function initBot() {
         defaultMove.canDig = false 
         defaultMove.allow1by1towers = false 
         defaultMove.allowParkour = true 
+        defaultMove.canOpenDoors = true
+        defaultMove.canOpenGates = true
         
         bot.pathfinder.setMovements(defaultMove)
     } catch (e) {}
+  })
+
+  // DIAGNÓSTICO DE PATHFINDER
+  bot.on('path_update', (r) => {
+    if (r.status === 'noPath') {
+        bot.chat("No encuentro camino para llegar ahí.")
+    }
   })
 
   async function procesarMensaje(usuario, mensaje, fuente) {
@@ -214,6 +223,7 @@ function initBot() {
           3. Si te piden hacer algo que no puedes (como poner bloques), di "No sé construir".
           4. Si te regañan, pide perdón y no hagas nada físico.
           5. Si te piden un COMANDO (/tpa, /home), escribe el comando tal cual (ej: "/tpa SrLeonardo"). NO uses #.
+          6. RESPONDE SIEMPRE EN UNA SOLA LÍNEA. Usa comas, no listas verticales.
           
           Mensaje nuevo: "${mensaje}"
         `
@@ -231,7 +241,7 @@ function initBot() {
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
                     const chatMsg = response.replace(/#GOTO.*/, '').trim()
-                    if(chatMsg) bot.chat(chatMsg)
+                    if(chatMsg) bot.chat(chatMsg.replace(/\n/g, ' '))
                     bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
                 }
             } 
@@ -240,12 +250,12 @@ function initBot() {
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
                     const chatMsg = response.replace(/#MINE.*/, '').trim()
-                    if(chatMsg) bot.chat(chatMsg)
+                    if(chatMsg) bot.chat(chatMsg.replace(/\n/g, ' '))
                     irYRomper(bot, x, y, z)
                 }
             }
             else {
-                bot.chat(response)
+                bot.chat(response.replace(/\n/g, ' | '))
             }
         } catch (e) { 
             console.error("❌ Error API:", e.message)
