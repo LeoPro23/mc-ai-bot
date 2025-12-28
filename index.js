@@ -82,13 +82,16 @@ function escanearEntorno(bot) {
                 block.name.includes('stairs')
             )
         },
-        maxDistance: 8,
-        count: 8
+        maxDistance: 32,
+        count: 50
     })
     
     const nombresBloques = bloquesInteresantes.map(pos => {
         const b = bot.blockAt(pos)
-        return `${b.name} en ${pos.x},${pos.y},${pos.z}`
+        let nombre = b.name
+        if (nombre.includes('ladder')) nombre = 'ESCALERA_MANO (ladder)'
+        if (nombre.includes('stairs')) nombre = 'ESCALON (stairs)'
+        return `${nombre} en ${pos.x},${pos.y},${pos.z}`
     })
 
     let vision = ""
@@ -208,7 +211,7 @@ function initBot() {
         const prompt = `
           Eres POLLOVIS, un asistente útil en Minecraft.
           Pos: ${botPos}. Dueño: ${infoDueño}.
-          (NOTA: Y es la altura. Si el dueño está más alto, busca el camino más optimo, ejm: escaleras de mano, escalones.).
+          (NOTA: Y es la altura. Si el dueño está ARRIBA, busca una ESCALERA_MANO y ve a su coordenada más alta).
           VISION: ${entorno}
           MEMORIA: ${chatHistory.join('\n')}
           
