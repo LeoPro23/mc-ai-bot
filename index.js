@@ -1,4 +1,3 @@
-// index.js
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoogleGenerativeAI } = require('@google/generative-ai')
@@ -6,22 +5,21 @@ const http = require('http')
 
 console.log('--- INICIANDO SCRIPT DEL BOT ---')
 
-// --- 1. SERVIDOR WEB INMORTAL ---
+// --- 1. SERVIDOR WEB (Puerto 8080) ---
 const webServer = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
   res.end('Bot Pollovis: ONLINE en puerto 8080.')
 })
 
-// CAMBIO: Usamos 8080 en lugar de 3000
 webServer.listen(8080, '0.0.0.0', () => {
   console.log('✅ Servidor web escuchando en puerto 8080')
 })
 
-// --- 2. VALIDACIÓN DE VARIABLES ---
+// --- 2. VALIDACIÓN ---
 if (!process.env.GEMINI_API_KEY) console.error('⚠️ ALERTA: Falta GEMINI_API_KEY')
 if (!process.env.MC_HOST) console.error('⚠️ ALERTA: Falta MC_HOST')
 
-// --- 3. CONFIGURACIÓN GEMINI ---
+// --- 3. IA ---
 let model = null
 try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
@@ -30,7 +28,7 @@ try {
     console.error('❌ Error configurando IA:', err)
 }
 
-// --- 4. LÓGICA DEL BOT ---
+// --- 4. BOT ---
 function initBot() {
   console.log(`🔄 Conectando a ${process.env.MC_HOST}:${process.env.MC_PORT}...`)
 
@@ -57,29 +55,40 @@ function initBot() {
         defaultMove.canDig = true
         defaultMove.allow1by1towers = false 
         bot.pathfinder.setMovements(defaultMove)
-    } catch (e) {
-        console.error('Error cargando físicas:', e)
-    }
+    } catch (e) { console.error('Error físicas:', e) }
   })
 
-  // --- CEREBRO IA ---
+  // --- CEREBRO CON DEPURACIÓN ---
   bot.on('chat', async (username, message) => {
-    if (username === bot.username || username !== '[Dueño] SrLeonardo') return
+    // 1. DEPURACIÓN: Ver qué está escuchando el bot realmente
+    if (username === bot.username) return
+    console.log(`[CHAT LOG] Usuario: '${username}' | Mensaje: '${message}'`)
+
+    // 2. FILTRO CORREGIDO: Usamos solo el nombre de usuario limpio
+    // Si el log de arriba dice que el usuario es "SrLeonardo", esto funcionará.
+    if (username !== 'SrLeonardo') {
+        console.log(`Ignorando a ${username} (No es SrLeonardo)`)
+        return
+    }
+
     if (!model) return
 
     if (message.toLowerCase().includes('pollo') || message.toLowerCase().includes(bot.username.toLowerCase())) {
+      console.log('⚡ Procesando comando con IA...')
+      
       const p = bot.entity.position
       const botPos = `x:${Math.floor(p.x)} y:${Math.floor(p.y)} z:${Math.floor(p.z)}`
       
+      // Buscar al jugador en la memoria del bot
       const target = bot.players[username] ? bot.players[username].entity : null
-      let playerInfo = target ? `Te veo en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}` : "No te veo."
+      let playerInfo = target ? `Te veo en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}` : "No te veo visualmente."
 
       const prompt = `Eres POLLOVIS. Pos: ${botPos}. Dueño: ${playerInfo}. Mensaje: "${message}". Si dice ven, usa sus coords. Muevete con #GOTO x y z. Responde corto.`
 
       try {
         const result = await model.generateContent(prompt)
         const response = result.response.text()
-        console.log(`💬 AI: ${response}`)
+        console.log(`💬 AI Responde: ${response}`)
 
         if (response.includes('#GOTO')) {
           const match = response.match(/#GOTO\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
@@ -105,5 +114,4 @@ function initBot() {
   })
 }
 
-// Arrancar
 initBot()
