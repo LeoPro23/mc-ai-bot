@@ -7,7 +7,13 @@ const { escanearEntorno } = require('./src/vision')
 const { irYRomper } = require('./src/actions')
 const { initAI, generateResponse } = require('./src/ai')
 
-console.log('--- INICIANDO SISTEMA POLLOVIS 5.2 (MODULAR) ---')
+// Función para logs con hora
+function log(msg) {
+    const time = new Date().toLocaleTimeString('es-ES', { hour12: false })
+    console.log(`[${time}] ${msg}`)
+}
+
+log('--- INICIANDO SISTEMA POLLOVIS 5.2 (MODULAR) ---')
 
 // Historial de conversación
 const chatHistory = []
@@ -19,7 +25,7 @@ startWebServer()
 initAI()
 
 function initBot() {
-  console.log(`🔄 Conectando...`)
+  log(`🔄 Conectando...`)
 
   const bot = mineflayer.createBot({
     host: MC_HOST,
@@ -35,7 +41,7 @@ function initBot() {
   bot.loadPlugin(toolPlugin)
 
   bot.once('spawn', () => {
-    console.log(`🚀 ${bot.username} conectado.`)
+    log(`🚀 ${bot.username} conectado.`)
     if (MC_AUTH_PASS) bot.chat(`/login ${MC_AUTH_PASS}`)
     
     try {
@@ -79,7 +85,7 @@ function initBot() {
     const esPrivado = fuente === 'whisper' || mensaje.includes('-> me')
 
     if (mencionaBot || esPrivado) {
-        console.log(`⚡ PROCESANDO de ${usuario}: "${mensaje}"`)
+        log(`⚡ PROCESANDO de ${usuario}: "${mensaje}"`)
         
         const p = bot.entity.position
         const botPos = `x:${Math.floor(p.x)} y:${Math.floor(p.y)} z:${Math.floor(p.z)}`
@@ -117,7 +123,7 @@ function initBot() {
 
         try {
             const response = await generateResponse(prompt)
-            console.log(`💬 Gemini: ${response}`)
+            log(`💬 IA: ${response}`)
 
             chatHistory.push(`Pollovis: ${response.replace(/#.*/, '').trim()}`)
 
@@ -144,7 +150,7 @@ function initBot() {
                 bot.chat(response.replace(/\n/g, ' | '))
             }
         } catch (e) { 
-            console.error("❌ Error API:", e.message)
+            log(`❌ Error API: ${e.message}`)
             bot.chat("Error cerebral.")
         }
     }
@@ -160,9 +166,9 @@ function initBot() {
     }
   })
 
-  bot.on('error', (e) => console.log('Error:', e))
+  bot.on('error', (e) => log(`Error: ${e}`))
   bot.on('end', () => {
-    console.log('Desconectado. Reconectando...')
+    log('Desconectado. Reconectando...')
     setTimeout(initBot, 10000)
   })
 }
