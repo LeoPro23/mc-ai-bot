@@ -6,11 +6,11 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "latest",
+    "minecraft-data": "latest",
     "mineflayer": "latest",
     "mineflayer-pathfinder": "latest",
-    "mineflayer-tool": "latest", 
-    "minecraft-data": "latest",
-    "dotenv": "latest",
-    "@google/generative-ai": "^0.11.0"
+    "mineflayer-tool": "latest"
   }
 }
