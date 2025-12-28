@@ -1,5 +1,5 @@
 {
-  "name": "mc-ai-bot",
+  "name": "pollovis-bot",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -8,6 +8,7 @@
   "dependencies": {
     "mineflayer": "latest",
     "mineflayer-pathfinder": "latest",
+    "minecraft-data": "latest", 
     "dotenv": "latest",
     "@google/generative-ai": "latest"
   }
