@@ -1,0 +1,14 @@
+{
+  "name": "mc-ai-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mineflayer": "latest",
+    "mineflayer-pathfinder": "latest",
+    "openai": "latest",
+    "dotenv": "latest"
+  }
+}
