@@ -77,7 +77,9 @@ function escanearEntorno(bot) {
                 block.name.includes('log') || 
                 block.name.includes('ore') || 
                 block.name.includes('diamond') ||
-                block.name.includes('plank')
+                block.name.includes('plank') ||
+                block.name.includes('ladder') ||
+                block.name.includes('stairs')
             )
         },
         maxDistance: 8,
