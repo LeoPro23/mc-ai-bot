@@ -98,16 +98,7 @@ function initBot() {
         chatHistory.push(`SrLeonardo: ${mensaje}`)
         if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
 
-        const prompt = `
-          ESTADO:
-          - Mi Pos: ${botPos}
-          - Dueño: ${infoDueño}
-          - Vision: ${entorno}
-          - Memoria: ${chatHistory.join(' | ')}
-          
-          MENSAJE DE SRLEONARDO: "${mensaje}"
-          RESPUESTA CORTA:
-        `
+        const prompt = `Pos:${botPos}. ${infoDueño}. Cerca:${entorno}. Historial:${chatHistory.join(' | ')}. Mensaje:${mensaje}. Respuesta:`
 
         try {
             const response = await generateResponse(prompt)
