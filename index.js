@@ -169,6 +169,7 @@ function initBot() {
         const prompt = `
           Eres POLLOVIS, un asistente útil en Minecraft.
           Pos: ${botPos}. Dueño: ${infoDueño}.
+          (NOTA: Y es la altura. Si el dueño está más alto, busca el camino más optimo, ejm: escaleras de mano, escalones.).
           VISION: ${entorno}
           MEMORIA: ${chatHistory.join('\n')}
           
@@ -196,7 +197,7 @@ function initBot() {
 
             // Lógica de Comandos
             if (response.includes('#GOTO')) {
-                const match = response.match(/#GOTO\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
+                const match = response.match(/#GOTO\s+(-?\d+)[,\s]+(-?\d+)[,\s]+(-?\d+)/)
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
                     const chatMsg = response.replace(/#GOTO.*/, '').trim()
@@ -205,7 +206,7 @@ function initBot() {
                 }
             } 
             else if (response.includes('#MINE')) {
-                const match = response.match(/#MINE\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
+                const match = response.match(/#MINE\s+(-?\d+)[,\s]+(-?\d+)[,\s]+(-?\d+)/)
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
                     const chatMsg = response.replace(/#MINE.*/, '').trim()
