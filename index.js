@@ -1,106 +1,193 @@
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
+const toolPlugin = require('mineflayer-tool').plugin // IMPORTANTE: Cargar el plugin
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 const http = require('http')
+const Vec3 = require('vec3')
 
-console.log('--- INICIANDO SISTEMA POLLOVIS 3.0 ---')
+console.log('--- INICIANDO SISTEMA POLLOVIS 5.1 (MINERO PRO) ---')
 
-// --- 1. CONFIGURACIÓN DEL MODELO ---
-// Según tu texto, el ID es 'gemini-3-flash-preview', pero si no tienes acceso
-// usaremos 'gemini-1.5-flash' que es la versión estable actual.
+// --- 1. CONFIGURACIÓN ---
 const MODELO_A_USAR = 'gemini-3-flash-preview' 
-// const MODELO_A_USAR = 'gemini-3-flash-preview' // DESCOMENTAR SI TIENES ACCESO BETA
 
-// --- 2. SERVIDOR WEB (Puerto 8080) ---
+// Historial de conversación (15 mensajes)
+const chatHistory = []
+const MAX_HISTORY = 15
+
+// --- 2. SERVIDOR WEB ---
 const webServer = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
   res.end(`Bot Pollovis ONLINE. Modelo: ${MODELO_A_USAR}`)
 })
 webServer.listen(8080, '0.0.0.0', () => console.log('✅ Web Server OK (8080)'))
 
-// --- 3. INICIALIZACIÓN IA CON DIAGNÓSTICO ---
+// --- 3. IA ---
 let model = null
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+try {
+    model = genAI.getGenerativeModel({ model: MODELO_A_USAR })
+    console.log(`✅ IA Lista: ${MODELO_A_USAR}`)
+} catch (e) { console.error('❌ Error IA:', e) }
 
-async function configurarIA() {
+// --- 4. FUNCIONES DE VISIÓN ---
+function escanearEntorno(bot) {
+    const entidades = Object.values(bot.entities)
+        .filter(e => e.position.distanceTo(bot.entity.position) < 10 && e.username !== bot.username)
+        .map(e => {
+            if (e.type === 'player') return `Jugador: ${e.username}`
+            if (e.type === 'mob') return `Mob: ${e.name}`
+            return null
+        }).filter(Boolean).slice(0, 5)
+
+    const bloquesInteresantes = bot.findBlocks({
+        matching: (block) => {
+            return block && (
+                block.name.includes('chest') || 
+                block.name.includes('bed') || 
+                block.name.includes('door') ||
+                block.name.includes('log') || 
+                block.name.includes('ore') || 
+                block.name.includes('diamond') ||
+                block.name.includes('plank')
+            )
+        },
+        maxDistance: 8,
+        count: 8
+    })
+    
+    const nombresBloques = bloquesInteresantes.map(pos => {
+        const b = bot.blockAt(pos)
+        return `${b.name} en ${pos.x},${pos.y},${pos.z}`
+    })
+
+    let vision = ""
+    if (entidades.length > 0) vision += `Entidades: ${entidades.join(', ')}. `
+    if (nombresBloques.length > 0) vision += `Bloques: ${nombresBloques.join(', ')}. `
+    if (vision === "") vision = "No veo nada relevante cerca."
+    
+    return vision
+}
+
+// --- 5. FUNCIÓN DE MINERÍA MEJORADA ---
+async function irYRomper(bot, x, y, z) {
+    const targetBlock = bot.blockAt(new Vec3(x, y, z))
+    if (!targetBlock) {
+        bot.chat("No veo ese bloque.")
+        return
+    }
+
+    bot.chat(`Voy a por ${targetBlock.name}...`)
+    
     try {
-        // Diagnóstico: Listar modelos disponibles para tu API KEY
-        // Esto nos dirá si realmente tienes acceso a la 1.5 o la 3.0
-        /* Nota: Si el código falla aquí con 404, es posible que tu API Key 
-           no tenga la API "Generative Language" habilitada en Google Cloud.
-        */
-        model = genAI.getGenerativeModel({ model: MODELO_A_USAR })
-        console.log(`✅ IA Configurada usando modelo: ${MODELO_A_USAR}`)
-    } catch (e) {
-        console.error('❌ Error CRÍTICO configurando IA:', e)
+        // 1. Ir hacia el bloque (Respetando canDig = false, osea sin romper paredes)
+        await bot.pathfinder.goto(new goals.GoalLookAtBlock(new Vec3(x, y, z), bot.world))
+        
+        // 2. Equipar herramienta (Gracias a mineflayer-tool)
+        try {
+            await bot.tool.equipForBlock(targetBlock, {}) 
+        } catch (err) {
+            console.log("No tengo herramienta óptima, usaré la mano.")
+        }
+
+        // 3. Romper
+        await bot.dig(targetBlock)
+        bot.chat("¡Roto!")
+    } catch (err) {
+        bot.chat("No pude llegar o romperlo.")
+        console.error(err)
     }
 }
-configurarIA()
 
-// --- 4. BOT MINECRAFT ---
+// --- 6. BOT MINECRAFT ---
 function initBot() {
-  console.log(`🔄 Conectando a ${process.env.MC_HOST}...`)
+  console.log(`🔄 Conectando...`)
 
   const bot = mineflayer.createBot({
     host: process.env.MC_HOST,
     port: parseInt(process.env.MC_PORT) || 25565,
-    username: process.env.MC_USER,
+    username: process.env.MC_USER || 'POLLOVIS',
     version: '1.21.4',
     auth: 'offline',
     checkTimeoutInterval: 60000 
   })
 
+  // CARGAR PLUGINS
   bot.loadPlugin(pathfinder)
+  bot.loadPlugin(toolPlugin) // <--- Cargamos el plugin de herramientas
 
   bot.once('spawn', () => {
-    console.log(`🚀 ${bot.username} conectado al juego.`)
+    console.log(`🚀 ${bot.username} conectado.`)
     bot.chat(`/login ${process.env.MC_AUTH_PASS}`)
     
     try {
         const mcData = require('minecraft-data')(bot.version)
         const defaultMove = new Movements(bot, mcData)
-        defaultMove.canDig = true
+        
+        // MANTENEMOS ESTO PARA QUE CAMINE SIN ROMPER TU CASA
+        defaultMove.canDig = false 
+        defaultMove.allow1by1towers = false 
+        defaultMove.allowParkour = true 
+        
         bot.pathfinder.setMovements(defaultMove)
     } catch (e) {}
   })
 
-  // --- FUNCIÓN DE PROCESAMIENTO INTELIGENTE ---
   async function procesarMensaje(usuario, mensaje, fuente) {
     if (!model) return
     if (usuario === bot.username) return
-
-    // Filtro de dueño flexible
+    
+    // FILTRO ESTRICTO: Solo SrLeonardo
     if (!usuario.includes('SrLeonardo')) return 
 
-    const mencionaBot = mensaje.toLowerCase().includes('pollo') || mensaje.toLowerCase().includes(bot.username.toLowerCase())
+    // COMANDO DE EMERGENCIA
+    const msgLower = mensaje.toLowerCase()
+    if (msgLower === 'para' || msgLower === 'stop' || msgLower === 'quieto') {
+        bot.pathfinder.setGoal(null)
+        bot.stopDigging()
+        bot.chat("Me detengo.")
+        return
+    }
+
+    const mencionaBot = msgLower.includes('pollo') || msgLower.includes(bot.username.toLowerCase())
     const esPrivado = fuente === 'whisper' || mensaje.includes('-> me')
 
     if (mencionaBot || esPrivado) {
-        console.log(`⚡ PROCESANDO (${fuente}) de ${usuario}: "${mensaje}"`)
+        console.log(`⚡ PROCESANDO de ${usuario}: "${mensaje}"`)
         
         const p = bot.entity.position
         const botPos = `x:${Math.floor(p.x)} y:${Math.floor(p.y)} z:${Math.floor(p.z)}`
         
-        // Contexto visual
         const target = Object.values(bot.players).find(p => p.username && p.username.includes('SrLeonardo'))?.entity
-        let playerInfo = target ? `Te veo en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}` : "No te veo visualmente."
+        let infoDueño = target ? `Dueño en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}` : "Dueño lejos/oculto."
+        
+        const entorno = escanearEntorno(bot)
+
+        chatHistory.push(`SrLeonardo: ${mensaje}`)
+        if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
 
         const prompt = `
           Eres POLLOVIS.
-          Usuario: ${usuario}. Mensaje: "${mensaje}".
-          Tu pos: ${botPos}. Info visual dueño: ${playerInfo}.
+          Pos: ${botPos}. Dueño: ${infoDueño}.
+          VISION: ${entorno}
+          MEMORIA: ${chatHistory.join('\n')}
           
           INSTRUCCIONES:
           1. Obedece a SrLeonardo.
           2. Si pide moverse ("ven", "sigueme"), usa #GOTO x y z.
-          3. Responde muy corto.
+          3. Si pide ROMPER, MINAR o TALAR algo que ves en "VISION", usa #MINE x y z.
+          4. Responde muy corto.
+          
+          Mensaje nuevo: "${mensaje}"
         `
 
         try {
             const result = await model.generateContent(prompt)
             const response = result.response.text()
-            console.log(`💬 Gemini Responde: ${response}`)
+            console.log(`💬 Gemini: ${response}`)
 
+            chatHistory.push(`Pollovis: ${response.replace(/#.*/, '').trim()}`)
+
+            // Lógica de Comandos
             if (response.includes('#GOTO')) {
                 const match = response.match(/#GOTO\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
                 if (match) {
@@ -109,28 +196,33 @@ function initBot() {
                     if(chatMsg) bot.chat(chatMsg)
                     bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
                 }
-            } else {
+            } 
+            else if (response.includes('#MINE')) {
+                const match = response.match(/#MINE\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
+                if (match) {
+                    const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
+                    const chatMsg = response.replace(/#MINE.*/, '').trim()
+                    if(chatMsg) bot.chat(chatMsg)
+                    irYRomper(bot, x, y, z)
+                }
+            }
+            else {
                 bot.chat(response)
             }
         } catch (e) { 
-            console.error("❌ Error API Gemini:", e.message)
-            bot.chat("Error de conexión con mi cerebro.") 
+            console.error("❌ Error API:", e.message)
+            bot.chat("Error cerebral.")
         }
     }
   }
 
-  // EVENTOS
+  // EVENTOS (Mismo filtro que validamos antes)
   bot.on('chat', (u, m) => procesarMensaje(u, m, 'chat'))
   bot.on('whisper', (u, m) => procesarMensaje(u, m, 'whisper'))
-  
-  // Respaldo para mensajes de sistema/plugins
   bot.on('messagestr', (msg) => {
     if (msg.includes('-> me') && msg.includes('SrLeonardo')) {
         const contenido = msg.split(']')[1] || msg 
         procesarMensaje('SrLeonardo', contenido.trim(), 'messagestr_privado')
-    }
-    else if (msg.includes('SrLeonardo') && (msg.includes('Pollo') || msg.includes('pollo'))) {
-        // Opcional: procesarMensaje('SrLeonardo', msg, 'messagestr_publico')
     }
   })
 
