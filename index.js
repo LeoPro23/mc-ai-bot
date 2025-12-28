@@ -1,24 +1,37 @@
-// index.js
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 const http = require('http')
 
-// --- 1. SERVIDOR WEB "INMORTAL" PARA EASYPANEL ---
-// Este servidor mantiene el contenedor vivo (Verde) aunque el bot se desconecte.
+console.log('--- INICIANDO SCRIPT DEL BOT ---')
+
+// --- 1. SERVIDOR WEB INMORTAL (CORREGIDO) ---
 const webServer = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('Bot Pollovis: SISTEMA ONLINE. (Si no esta en el juego, revisa los logs)')
+  res.end('Bot Pollovis: ONLINE. Estado: Ejecutandose.')
 })
-webServer.listen(3000, () => console.log('✅ Sistema de salud web iniciado en puerto 3000'))
 
-// --- 2. CONFIGURACIÓN GEMINI ---
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+// IMPORTANTE: '0.0.0.0' permite que Easypanel vea el puerto desde fuera
+webServer.listen(3000, '0.0.0.0', () => {
+  console.log('✅ Servidor web escuchando en puerto 3000 (0.0.0.0)')
+})
 
-// --- 3. FUNCIÓN PRINCIPAL DEL BOT (RECONEXIÓN) ---
+// --- 2. VALIDACIÓN DE VARIABLES ---
+if (!process.env.GEMINI_API_KEY) console.error('⚠️ ALERTA: Falta GEMINI_API_KEY')
+if (!process.env.MC_HOST) console.error('⚠️ ALERTA: Falta MC_HOST')
+
+// --- 3. CONFIGURACIÓN GEMINI ---
+let model = null
+try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+} catch (err) {
+    console.error('❌ Error configurando IA:', err)
+}
+
+// --- 4. LÓGICA DEL BOT ---
 function initBot() {
-  console.log('🔄 Iniciando conexión con Minecraft...')
+  console.log(`🔄 Conectando a ${process.env.MC_HOST}:${process.env.MC_PORT}...`)
 
   const bot = mineflayer.createBot({
     host: process.env.MC_HOST,
@@ -31,40 +44,40 @@ function initBot() {
 
   bot.loadPlugin(pathfinder)
 
-  // --- EVENTOS DEL JUEGO ---
   bot.once('spawn', () => {
-    console.log(`🚀 ¡${bot.username} ha entrado al servidor!`)
-    
-    // Login automático
+    console.log(`🚀 ¡${bot.username} ha entrado!`)
     const pass = process.env.MC_AUTH_PASS || 'PolloSeguro123'
     bot.chat(`/login ${pass}`)
     
-    // Configurar física
-    const mcData = require('minecraft-data')(bot.version)
-    const defaultMove = new Movements(bot, mcData)
-    defaultMove.canDig = true
-    defaultMove.allow1by1towers = false 
-    bot.pathfinder.setMovements(defaultMove)
+    // Física
+    try {
+        const mcData = require('minecraft-data')(bot.version)
+        const defaultMove = new Movements(bot, mcData)
+        defaultMove.canDig = true
+        defaultMove.allow1by1towers = false 
+        bot.pathfinder.setMovements(defaultMove)
+    } catch (e) {
+        console.error('Error cargando físicas:', e)
+    }
   })
 
-  // Cerebro IA
   bot.on('chat', async (username, message) => {
-    if (username === bot.username) return
-    if (username !== 'SrLeonardo') return // Solo obedece al dueño
+    if (username === bot.username || username !== 'SrLeonardo') return
+    if (!model) return
 
     if (message.toLowerCase().includes('pollo') || message.toLowerCase().includes(bot.username.toLowerCase())) {
       const p = bot.entity.position
       const botPos = `x:${Math.floor(p.x)} y:${Math.floor(p.y)} z:${Math.floor(p.z)}`
       
       const target = bot.players[username] ? bot.players[username].entity : null
-      let playerInfo = target ? `Te veo en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}` : "No te veo visualmente."
+      let playerInfo = target ? `Te veo en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}` : "No te veo."
 
-      const prompt = `Eres POLLOVIS, mayordomo de SrLeonardo. Tu pos: ${botPos}. Info visual dueño: ${playerInfo}. Mensaje: "${message}". INSTRUCCIONES: Obedece a SrLeonardo. Si dice "ven", usa sus coordenadas visuales. Para moverte termina con: #GOTO x y z. Responde corto.`
+      const prompt = `Eres POLLOVIS. Pos: ${botPos}. Dueño: ${playerInfo}. Mensaje: "${message}". Si dice ven, usa sus coords. Muevete con #GOTO x y z. Responde corto.`
 
       try {
         const result = await model.generateContent(prompt)
         const response = result.response.text()
-        console.log(`💬 POLLOVIS: ${response}`)
+        console.log(`💬 AI: ${response}`)
 
         if (response.includes('#GOTO')) {
           const match = response.match(/#GOTO\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/)
@@ -77,22 +90,18 @@ function initBot() {
         } else {
           bot.chat(response)
         }
-      } catch (e) {
-        console.error("❌ Error Gemini:", e)
-      }
+      } catch (e) { console.error("Error Gemini:", e) }
     }
   })
 
-  // --- MANEJO DE ERRORES Y RECONEXIÓN ---
-  bot.on('kicked', (reason) => console.log('⚠️ Fui expulsado:', reason))
-  bot.on('error', (err) => console.log('❌ Error de conexión:', err))
+  bot.on('kicked', (r) => console.log('⚠️ Expulsado:', r))
+  bot.on('error', (err) => console.log('❌ Error conexión:', err))
   
   bot.on('end', () => {
-    console.log('🔴 Bot desconectado. Reintentando en 10 segundos...')
-    // Esperamos 10 segundos y volvemos a llamar a initBot()
-    setTimeout(initBot, 10000)
+    console.log('🔴 Desconectado. Reconectando en 15s...')
+    setTimeout(initBot, 15000)
   })
 }
 
-// Iniciar el bot por primera vez
+// Arrancar
 initBot()
