@@ -218,10 +218,34 @@ MENSAJE: "${mensaje}"`
   // EVENTOS
   bot.on('chat', (u, m) => procesarMensaje(u, m, 'chat'))
   bot.on('whisper', (u, m) => procesarMensaje(u, m, 'whisper'))
+  
   bot.on('messagestr', (msg) => {
-    if (msg.includes('-> me') && msg.includes('SrLeonardo')) {
-        const contenido = msg.split(']')[1] || msg 
-        procesarMensaje('SrLeonardo', contenido.trim(), 'messagestr_privado')
+    // Log para debug (puedes quitarlo luego)
+    if (!msg.includes(bot.username)) log(`📩 Mensaje recibido: ${msg}`)
+
+    // Ignorar mensajes del propio bot
+    if (msg.includes(bot.username)) return
+
+    // 1. Detectar Susurros (Whispers)
+    if (msg.includes('-> me') || msg.includes('whispers to you')) {
+        const whisperMatch = msg.match(/(\w+)\s+(?:whispers to you|-> me)\s*:\s*(.*)/i)
+        if (whisperMatch) {
+            procesarMensaje(whisperMatch[1], whisperMatch[2], 'whisper')
+            return
+        }
+    }
+
+    // 2. Detectar Chat Global con Prefijos (Ej: [Not Secure] [Dueño] SrLeonardo: hola)
+    // Este regex busca el último nombre antes de los dos puntos, saltando prefijos entre corchetes
+    const chatMatch = msg.match(/(?:\[.*?\]\s*)*(\w+)\s*:\s*(.*)/)
+    if (chatMatch) {
+        const usuario = chatMatch[1]
+        const contenido = chatMatch[2]
+        
+        // Evitar procesar mensajes del sistema o logs
+        if (usuario === 'Server' || usuario === 'INFO' || usuario === 'WARN') return
+        
+        procesarMensaje(usuario, contenido, 'chat_global_parsed')
     }
   })
 
