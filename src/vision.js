@@ -7,57 +7,53 @@ function escanearEntorno(bot) {
             return null
         }).filter(Boolean).slice(0, 5)
 
-    // 1. Bloques de Navegación (Prioridad Alta: Escaleras y Puertas)
+    // 1. Bloques de Navegación (Prioridad: Escaleras, Puertas)
     const bloquesNavegacion = bot.findBlocks({
         matching: (block) => {
             return block && (
                 block.name.includes('ladder') || 
                 block.name.includes('stairs') ||
-                block.name.includes('door') ||
-                block.name.includes('gate')
+                block.name.includes('door')
             )
         },
-        maxDistance: 32,
-        count: 100 // ¡Aumentado para ver escaleras largas completas!
+        maxDistance: 16,
+        count: 50
     })
+
+    // Agrupar escaleras para encontrar la más alta y la más baja
+    const ladders = bloquesNavegacion.filter(pos => bot.blockAt(pos).name.includes('ladder'))
+    let ladderInfo = ""
+    if (ladders.length > 0) {
+        const highest = ladders.reduce((prev, current) => (prev.y > current.y) ? prev : current)
+        const lowest = ladders.reduce((prev, current) => (prev.y < current.y) ? prev : current)
+        ladderInfo = `ESCALERA(Base:x:${lowest.x},y:${lowest.y},z:${lowest.z} | Top:x:${highest.x},y:${highest.y+1},z:${highest.z}). `
+    }
 
     // 2. Bloques de Interés (Recursos)
     const bloquesRecursos = bot.findBlocks({
         matching: (block) => {
             return block && (
                 block.name.includes('chest') || 
-                block.name.includes('bed') || 
-                block.name.includes('log') || 
                 block.name.includes('ore') || 
-                block.name.includes('diamond') ||
-                block.name.includes('plank')
+                block.name.includes('diamond')
             )
         },
-        maxDistance: 16, // Menos rango para no saturar
-        count: 20
+        maxDistance: 12,
+        count: 10
     })
     
-    const todosLosBloques = [...bloquesNavegacion, ...bloquesRecursos]
+    const todosLosBloques = [...bloquesNavegacion.filter(p => !bot.blockAt(p).name.includes('ladder')), ...bloquesRecursos]
 
-    // Ordenar por distancia para que los más cercanos estén primero
-    todosLosBloques.sort((a, b) => {
-        return a.distanceTo(bot.entity.position) - b.distanceTo(bot.entity.position)
-    })
-
-    const nombresBloques = todosLosBloques.slice(0, 20).map(pos => {
+    const nombresBloques = todosLosBloques.slice(0, 10).map(pos => {
         const b = bot.blockAt(pos)
         let nombre = b.name
-        if (nombre.includes('ladder')) nombre = 'ESCALERA'
         if (nombre.includes('stairs')) nombre = 'ESCALON'
-        
-        // Añadir indicador de altura relativa
         const relY = pos.y - Math.floor(bot.entity.position.y)
         const alturaStr = relY > 0 ? `+${relY}` : relY < 0 ? `${relY}` : "nivel"
-        
         return `${nombre}(x:${pos.x},y:${pos.y},z:${pos.z},${alturaStr})`
     })
 
-    let vision = ""
+    let vision = ladderInfo
     if (entidades.length > 0) vision += `Entidades: ${entidades.join(', ')}. `
     if (nombresBloques.length > 0) vision += `Bloques: ${nombresBloques.join(', ')}. `
     

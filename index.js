@@ -62,7 +62,8 @@ function initBot() {
         defaultMove.canOpenDoors = true
         defaultMove.canOpenGates = true
         defaultMove.allowSprinting = true
-        defaultMove.allowFreeMotion = true // Ayuda en escaleras y huecos
+        defaultMove.allowFreeMotion = true 
+        defaultMove.jumpCost = 0.5 // Reducir el "coste" de saltar para que no le importe saltar a la escalera
         
         bot.pathfinder.setMovements(defaultMove)
     } catch (e) {
@@ -128,8 +129,14 @@ MENSAJE DE SRLEONARDO: "${mensaje}"`
             const response = await generateResponse(prompt)
             log(`💬 IA: ${response}`)
 
-            // 1. Extraer y limpiar el mensaje de texto (sin comandos #)
-            const textoLimpio = response.replace(/#\w+.*?(\s|$)/g, '').trim()
+            // 1. Extraer y limpiar el mensaje de texto (sin comandos # y sin coordenadas sueltas)
+            let textoLimpio = response.replace(/#\w+.*?(\s|$)/g, '').trim()
+            
+            // SEGURIDAD: Eliminar cualquier patrón de coordenadas (3 números seguidos) para no exponer la base
+            textoLimpio = textoLimpio.replace(/-?\d+[,\s]+-?\d+[,\s]+-?\d+/g, '').trim()
+            // Eliminar comas o puntos que hayan quedado sueltos al principio tras borrar las coordenadas
+            textoLimpio = textoLimpio.replace(/^[,.\s]+/, '')
+
             if (textoLimpio) {
                 bot.chat(textoLimpio.replace(/\n/g, ' '))
                 chatHistory.push(`Pollovis: ${textoLimpio}`)
@@ -142,7 +149,8 @@ MENSAJE DE SRLEONARDO: "${mensaje}"`
                 const match = response.match(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                    bot.pathfinder.setGoal(new goals.GoalNear(x, y, z, 1))
+                    // Usamos GoalBlock para que intente llegar EXACTAMENTE al punto (importante para escaleras)
+                    bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
                 }
             } 
             
