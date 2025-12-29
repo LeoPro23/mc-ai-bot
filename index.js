@@ -63,7 +63,8 @@ function initBot() {
         defaultMove.canOpenGates = true
         defaultMove.allowSprinting = true
         defaultMove.allowFreeMotion = true 
-        defaultMove.jumpCost = 0.5 // Reducir el "coste" de saltar para que no le importe saltar a la escalera
+        defaultMove.jumpCost = 0.1 // Coste mínimo para que salte a la escalera sin dudar
+        defaultMove.climbCost = 10 // Prefiere usar escaleras
         
         bot.pathfinder.setMovements(defaultMove)
     } catch (e) {
