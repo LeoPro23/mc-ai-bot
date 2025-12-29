@@ -63,8 +63,12 @@ function initBot() {
         defaultMove.canOpenGates = true
         defaultMove.allowSprinting = true
         defaultMove.allowFreeMotion = true 
-        defaultMove.jumpCost = 0.1 // Coste mínimo para que salte a la escalera sin dudar
-        defaultMove.climbCost = 10 // Prefiere usar escaleras
+        defaultMove.jumpCost = 0.1 
+        defaultMove.climbCost = 10 
+        
+        // Forzar que las escaleras sean transitables incluso si están un bloque arriba
+        const ladderId = mcData.blocksByName.ladder.id
+        defaultMove.exclusionAreas = [] // Limpiar áreas de exclusión
         
         bot.pathfinder.setMovements(defaultMove)
     } catch (e) {
@@ -146,10 +150,11 @@ MENSAJE: "${mensaje}"`
             if (esDueño) {
                 // #GOTO
                 if (response.includes('#GOTO')) {
-                    const match = response.match(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
-                    if (match) {
+                    const matches = response.matchAll(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/gi)
+                    for (const match of matches) {
                         const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                        bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
+                        // Usar GoalNear para la base y GoalBlock para el top
+                        bot.pathfinder.setGoal(new goals.GoalNear(x, y, z, 0.5))
                     }
                 } 
                 
