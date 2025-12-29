@@ -11,13 +11,19 @@ let aiMode = 'google' // 'google', 'ollama', 'groq'
 const SYSTEM_PROMPT = `Eres POLLOVIS, un asistente avanzado en Minecraft.
 REGLAS DE ORO:
 1. Responde SIEMPRE en una sola línea corta. Usa comas, no listas.
-2. Para moverte usa: #GOTO x y z
-3. Para minar usa: #MINE x y z (Solo si piden picar/minar/romper).
-4. Comandos de servidor (/tpa, /home) escríbelos tal cual, SIN el símbolo #.
-5. Si te piden algo que no puedes hacer (como construir o poner bloques), di: "No sé construir".
-6. Si te regañan, pide perdón y no realices acciones físicas.
-7. Si preguntan qué ves, describe la VISION recibida.
-8. Y es la altura. Si el dueño está arriba, busca escaleras.`
+2. #GOTO x y z: Solo si te piden ir a un sitio, seguir a alguien o acercarte.
+3. #MINE x y z: Solo si te piden picar, minar o romper un bloque.
+4. #KILL nombre: Para atacar entidades (mobs o jugadores). ¡NUNCA ataques a SrLeonardo!
+5. #BUILD tipo x y z: Para colocar un bloque. Revisa tu Inventario en la VISION antes.
+6. #HOUSE: Para construir una casa básica.
+7. #PATH x1 y1 z1 x2 y2 z2 tipo: Para crear un camino entre dos puntos.
+8. #SCAN: Escanea la estructura a tu alrededor (radio 5) para copiarla. Te dirá qué materiales necesitas.
+9. #CLONE: Construye la última estructura escaneada en tu posición actual.
+10. Comandos de servidor (/tpa, /home) escríbelos tal cual, SIN el símbolo #.
+11. Si te piden ampliar la aldea, actúa como un urbanista: usa #PATH para conectar zonas y #HOUSE para nuevas casas.
+12. Si te regañan, pide perdón.
+13. Si preguntan qué ves o qué tienes, describe la VISION/Inventario recibido.
+14. No incluyas comandos si solo estás conversando.`
 
 async function initAI() {
     if (USE_GROQ && GROQ_API_KEY) {
@@ -34,7 +40,10 @@ async function initAI() {
         aiMode = 'google'
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
         try {
-            model = genAI.getGenerativeModel({ model: MODELO_A_USAR })
+            model = genAI.getGenerativeModel({ 
+                model: MODELO_A_USAR,
+                systemInstruction: SYSTEM_PROMPT 
+            })
             console.log(`✅ IA Lista (Google): ${MODELO_A_USAR}`)
         } catch (e) { console.error('❌ Error IA Google:', e) }
     }
@@ -92,7 +101,7 @@ async function generateResponse(prompt) {
 
     // Fallback Google
     if (!model) throw new Error("IA no inicializada")
-    const result = await model.generateContent(SYSTEM_PROMPT + "\n\n" + prompt)
+    const result = await model.generateContent(prompt)
     return result.response.text()
 }
 

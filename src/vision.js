@@ -55,6 +55,13 @@ function escanearEntorno(bot) {
     let vision = ""
     if (entidades.length > 0) vision += `Entidades: ${entidades.join(', ')}. `
     if (nombresBloques.length > 0) vision += `Bloques: ${nombresBloques.join(', ')}. `
+    
+    // Añadir Inventario
+    const inventario = bot.inventory.items()
+        .map(item => `${item.name} x${item.count}`)
+        .join(', ')
+    if (inventario) vision += `Inventario: ${inventario}. `
+
     if (vision === "") vision = "No veo nada relevante cerca."
     
     return vision

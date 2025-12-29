@@ -1,10 +1,11 @@
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const toolPlugin = require('mineflayer-tool').plugin
+const pvp = require('mineflayer-pvp').plugin
 const { MC_HOST, MC_PORT, MC_USER, MC_AUTH_PASS, MAX_HISTORY } = require('./src/config')
 const { startWebServer } = require('./src/web')
 const { escanearEntorno } = require('./src/vision')
-const { irYRomper } = require('./src/actions')
+const { irYRomper, atacarEntidad, construirBloque, construirEstructura, stopBuilding, construirCamino, escanearEstructura, clonarEstructura } = require('./src/actions')
 const { initAI, generateResponse } = require('./src/ai')
 
 // Función para logs con hora
@@ -39,6 +40,7 @@ function initBot() {
   // CARGAR PLUGINS
   bot.loadPlugin(pathfinder)
   bot.loadPlugin(toolPlugin)
+  bot.loadPlugin(pvp)
 
   bot.once('spawn', () => {
     log(`🚀 ${bot.username} conectado.`)
@@ -77,6 +79,8 @@ function initBot() {
     if (msgLower === 'para' || msgLower === 'stop' || msgLower === 'quieto') {
         bot.pathfinder.setGoal(null)
         bot.stopDigging()
+        bot.pvp.stop()
+        stopBuilding()
         bot.chat("Me detengo.")
         return
     }
@@ -98,7 +102,13 @@ function initBot() {
         chatHistory.push(`SrLeonardo: ${mensaje}`)
         if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
 
-        const prompt = `Pos:${botPos}. ${infoDueño}. Vision:${entorno}. Historial:${chatHistory.join(' | ')}. Mensaje:${mensaje}`
+        const prompt = `ESTADO ACTUAL:
+- Mi Posición: ${botPos}
+- ${infoDueño}
+- Visión: ${entorno}
+- Historial reciente: ${chatHistory.join(' | ')}
+
+MENSAJE DE SRLEONARDO: "${mensaje}"`
 
         try {
             const response = await generateResponse(prompt)
@@ -124,6 +134,39 @@ function initBot() {
                     if(chatMsg) bot.chat(chatMsg.replace(/\n/g, ' '))
                     irYRomper(bot, x, y, z)
                 }
+            }
+            else if (response.includes('#KILL')) {
+                const match = response.match(/#KILL\s+(\w+)/i)
+                if (match) {
+                    const targetName = match[1]
+                    atacarEntidad(bot, targetName)
+                }
+            }
+            else if (response.includes('#BUILD')) {
+                const match = response.match(/#BUILD\s+(\w+)\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
+                if (match) {
+                    const tipo = match[1], x = parseInt(match[2]), y = parseInt(match[3]), z = parseInt(match[4])
+                    construirBloque(bot, tipo, x, y, z)
+                }
+            }
+            else if (response.includes('#HOUSE')) {
+                const p = bot.entity.position
+                construirEstructura(bot, 'casa', Math.floor(p.x) + 1, Math.floor(p.y), Math.floor(p.z) + 1)
+            }
+            else if (response.includes('#PATH')) {
+                const match = response.match(/#PATH\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\w+)/i)
+                if (match) {
+                    const x1 = parseInt(match[1]), y1 = parseInt(match[2]), z1 = parseInt(match[3])
+                    const x2 = parseInt(match[4]), y2 = parseInt(match[5]), z2 = parseInt(match[6])
+                    const tipo = match[7]
+                    construirCamino(bot, x1, y1, z1, x2, y2, z2, tipo)
+                }
+            }
+            else if (response.includes('#SCAN')) {
+                escanearEstructura(bot, 5) // Radio de 5 bloques por defecto
+            }
+            else if (response.includes('#CLONE')) {
+                clonarEstructura(bot)
             }
             else {
                 bot.chat(response.replace(/\n/g, ' | '))
