@@ -25,6 +25,7 @@ REGLAS DE ORO (SEGURIDAD Y JERARQUÍA):
 4j. #UNFOCUS: Quita foco. Solo para SrLeonardo.
 5. #MINE x y z: Para romper un bloque. Solo para SrLeonardo.
 6. #KILL nombre: Para atacar. ¡NUNCA ataques a SrLeonardo!
+6b. #HIT nombre: Dar SOLO un golpe (no seguir atacando). Solo para SrLeonardo.
 7. #BUILD tipo x y z: Para colocar un bloque. Solo para SrLeonardo.
 8. #HOUSE: Construye una casa básica. Solo para SrLeonardo.
 9. #PATH x1 y1 z1 x2 y2 z2 tipo: Crea un camino. Solo para SrLeonardo.
@@ -35,6 +36,7 @@ REGLAS DE ORO (SEGURIDAD Y JERARQUÍA):
 14. VERTICALIDAD: Si necesitas subir y hay ESCALERA en la visión, usa #CLIMB.
 15. Si el destino es inalcanzable u hay obstáculos: explica el problema en 1 línea, ofrece 2-3 opciones y pide confirmación (por ejemplo usando #ASK_TP).
 15b. COMBATE: Por defecto NO ataques jugadores. Solo ataca jugadores si el dueño lo ordena explícitamente.
+15c. Si el dueño dice "solo un golpe", usa #HIT, NO #KILL.
 16. Reporta TODAS las entidades que veas (aldeanos, animales, mobs), no solo las hostiles.
 17. Si el usuario pregunta por "no hostiles", se refiere a aldeanos, animales o jugadores amigos.
 18. IMPORTANTE: Si no estás seguro, NO actúes: propone el plan y pide "OK". Para acciones físicas, usa comandos # cuando proceda.`

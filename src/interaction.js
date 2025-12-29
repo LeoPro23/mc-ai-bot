@@ -1,7 +1,14 @@
 let pendingDecision = null
+let lastTpaAt = 0
 
 function requestTeleportTo(bot, playerName) {
     if (!playerName) playerName = 'SrLeonardo'
+    const now = Date.now()
+    if (now - lastTpaAt < 12000) {
+        bot.chat('Ya pedí TP hace poco; acepta la solicitud (normalmente /tpaccept).')
+        return
+    }
+    lastTpaAt = now
     bot.chat(`/tpa ${playerName}`)
     bot.chat('Te envié solicitud de TP. Acepta (normalmente /tpaccept).')
 }
@@ -22,12 +29,9 @@ function askOwnerDecision(bot, reason, opts = {}) {
         expiresAt: now + 30000
     }
 
-    bot.chat(
-        'No hay camino claro para llegar a ti. ¿Qué hago? ' +
-        '1) Reintento seguirte, 2) Me quedo quieto y reintento, 3) Pido TP con /tpa. ' +
-        'También puedes responder OK para que ejecute la opción recomendada. ' +
-        'Si quieres que haga un rescate con picar/construir, responde: AUTORIZO RESCATE (30s).'
-    )
+    // Mantener mensajes cortos para que el servidor no los parta a mitad de palabra.
+    bot.chat('No hay camino claro. Opciones: 1=reintento, 2=espera, 3=pido TP. OK=proceder.')
+    bot.chat('Si autorizas acciones riesgosas: responde RESCATE (30s).')
 }
 
 function handleOwnerResponse(bot, message, followTargetName, restartFollowCallback) {
@@ -68,7 +72,7 @@ function handleOwnerResponse(bot, message, followTargetName, restartFollowCallba
         requestTeleportTo(bot, targetName)
         return true
     }
-    if (/autorizo\s+rescate/i.test(msg)) {
+    if (/\brescate\b/i.test(msg)) {
         clearPendingDecision()
         bot.chat('Recibido. Para evitar romper/construir por error, dime exactamente qué hacer con un comando # (por ejemplo #MINE, #BUILD, #HOUSE, #PATH).')
         return true

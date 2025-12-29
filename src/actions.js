@@ -55,6 +55,30 @@ async function atacarEntidad(bot, nombre) {
     }, 1000)
 }
 
+async function golpearUnaVez(bot, nombre) {
+    const entity = bot.nearestEntity(e =>
+        (e.name && e.name.toLowerCase().includes(nombre.toLowerCase())) ||
+        (e.username && e.username.toLowerCase().includes(nombre.toLowerCase()))
+    )
+
+    if (!entity) {
+        bot.chat(`No encuentro a ningún ${nombre} cerca.`)
+        return
+    }
+
+    bot.chat(`Un golpe a ${entity.name || entity.username}.`)
+    try {
+        await bot.lookAt(entity.position.offset(0, 1, 0))
+    } catch {}
+    try {
+        bot.attack(entity)
+    } catch (e) {
+        console.error(e)
+    }
+    // Asegurar que no quede en modo pvp continuo
+    try { bot.pvp.stop() } catch {}
+}
+
 async function construirBloque(bot, tipo, x, y, z) {
     const targetPos = new Vec3(x, y, z)
     
@@ -87,4 +111,4 @@ async function construirBloque(bot, tipo, x, y, z) {
     }
 }
 
-module.exports = { irYRomper, atacarEntidad, construirBloque, construirEstructura, stopBuilding, construirCamino, escanearEstructura, clonarEstructura }
+module.exports = { irYRomper, atacarEntidad, golpearUnaVez, construirBloque, construirEstructura, stopBuilding, construirCamino, escanearEstructura, clonarEstructura }

@@ -6,7 +6,7 @@ const pvp = require('mineflayer-pvp').plugin
 const { MC_HOST, MC_PORT, MC_USER, MC_AUTH_PASS, MAX_HISTORY } = require('./src/config')
 const { startWebServer } = require('./src/web')
 const { escanearEntorno } = require('./src/vision')
-const { irYRomper, atacarEntidad, construirBloque, construirEstructura, stopBuilding, construirCamino, escanearEstructura, clonarEstructura } = require('./src/actions')
+const { irYRomper, atacarEntidad, golpearUnaVez, construirBloque, construirEstructura, stopBuilding, construirCamino, escanearEstructura, clonarEstructura } = require('./src/actions')
 const { initAI, generateResponse } = require('./src/ai')
 const { setCombatMode, combatTick, notifyOwner } = require('./src/combat')
 const { askOwnerDecision, handleOwnerResponse, requestTeleportTo, clearPendingDecision } = require('./src/interaction')
@@ -44,6 +44,23 @@ function initBot() {
   bot.loadPlugin(pathfinder)
   bot.loadPlugin(toolPlugin)
   bot.loadPlugin(pvp)
+
+    // Anti-duplicados (mismo usuario/mensaje/fuente en ventana corta)
+    const recentMessages = new Map()
+    function shouldProcessMessage(usuario, mensaje, fuente) {
+        const key = `${fuente}:${usuario}:${mensaje}`
+        const now = Date.now()
+        const last = recentMessages.get(key)
+        if (last && (now - last) < 900) return false
+        recentMessages.set(key, now)
+        // Limpieza ligera
+        if (recentMessages.size > 250) {
+            for (const [k, t] of recentMessages) {
+                if (now - t > 15000) recentMessages.delete(k)
+            }
+        }
+        return true
+    }
 
     // Estado de seguimiento
     let following = false
@@ -346,6 +363,7 @@ function initBot() {
 
   async function procesarMensaje(usuario, mensaje, fuente) {
     if (usuario === bot.username) return
+        if (!shouldProcessMessage(usuario, mensaje, fuente)) return
     
     const esDueño = usuario.includes('SrLeonardo')
     const msgLower = mensaje.toLowerCase()
@@ -368,10 +386,15 @@ function initBot() {
     }
 
     // COMANDO DE EMERGENCIA (Solo Dueño)
-        if (esDueño && (msgLower === 'para' || msgLower === 'stop' || msgLower === 'quieto')) {
+        if (esDueño && (
+            msgLower === 'para' || msgLower === 'stop' || msgLower === 'quieto' ||
+            msgLower.includes('deja de atacar') || msgLower.includes('deja de hacer') ||
+            msgLower.includes('no hagas nada') || msgLower.includes('alto')
+        )) {
         bot.pathfinder.setGoal(null)
         bot.stopDigging()
         bot.pvp.stop()
+        try { setCombatMode(bot, { enabled: false, assistOwner: false, guardOwner: false, focusQuery: null }) } catch {}
         stopBuilding()
                 stopFollow()
         bot.chat("Me detengo.")
@@ -587,6 +610,14 @@ MENSAJE: "${mensaje}"`
                     }
                 }
 
+                // #HIT (un golpe)
+                if (response.includes('#HIT')) {
+                    const match = response.match(/#HIT\s+(\w+)/i)
+                    if (match) {
+                        golpearUnaVez(bot, match[1])
+                    }
+                }
+
                 // #BUILD
                 if (response.includes('#BUILD')) {
                     const match = response.match(/#BUILD\s+(\w+)\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
@@ -645,16 +676,7 @@ MENSAJE: "${mensaje}"`
     // Asumimos que el bot tiene un prefijo o formato estándar
     if (msg.startsWith(`[Pollo] ${bot.username}`) || msg.startsWith(`${bot.username}:`)) return
 
-    // 1. Detectar Susurros (Whispers)
-    if (msg.includes('-> me') || msg.includes('whispers to you')) {
-        const whisperMatch = msg.match(/(\w+)\s+(?:whispers to you|-> me)\s*:\s*(.*)/i)
-        if (whisperMatch) {
-            procesarMensaje(whisperMatch[1], whisperMatch[2], 'whisper')
-            return
-        }
-    }
-
-    // 2. Fallback para Chat Global si el evento 'chat' no se disparó
+    // Fallback para Chat Global si el evento 'chat' no se disparó
     // Intentamos parsear manualmente si vemos estructura de chat
     const chatMatch = msg.match(/(?:\[.*?\]\s*)*(\w+)\s*:\s*(.*)/)
     if (chatMatch) {
