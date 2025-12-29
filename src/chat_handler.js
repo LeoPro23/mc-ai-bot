@@ -151,9 +151,11 @@ async function procesarMensaje(bot, usuario, mensaje, fuente, isEating) {
         const yDiff = target ? Math.floor(target.position.y - p.y) : null
         const dir = target ? cardinalFromDelta(dx, dz) : null
 
-        // Scan environment logic needs to be passed or imported? Imported from vision.
+        // Scan environment
         const { escanearEntorno } = require('./vision')
+        const { getAwarenessState } = require('./awareness')
         const entorno = escanearEntorno(bot)
+        const eventosRecientes = getAwarenessState()
 
         chatHistory.push(`${usuario}: ${mensaje}`)
         if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
@@ -162,6 +164,7 @@ async function procesarMensaje(bot, usuario, mensaje, fuente, isEating) {
     - Mi nivel Y: ${myY}
     - Dueño: ${target ? `a ${dist}m hacia ${dir}${yDiff !== null ? (yDiff > 1 ? `, arriba ${yDiff}` : yDiff < -1 ? `, abajo ${Math.abs(yDiff)}` : '') : ''}` : 'no visible'}
     - Visión (sin coordenadas): ${entorno}
+    - EVENTOS RECIENTES (Daño/Peligro): ${eventosRecientes || 'Ninguno relevante'}
     - Historial reciente: ${chatHistory.join(' | ')}
 
 USUARIO ACTUAL: ${usuario} (${esDueño ? 'ES EL DUEÑO' : 'NO ES EL DUEÑO'})

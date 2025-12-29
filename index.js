@@ -7,6 +7,7 @@ const { startWebServer } = require('./src/web')
 const { initAI } = require('./src/ai')
 const { setupNavigation } = require('./src/navigation')
 const { setupChat } = require('./src/chat_handler')
+const { setupAwareness } = require('./src/awareness')
 
 // Logs con hora
 function log(msg) {
@@ -42,6 +43,7 @@ function initBot() {
     // Modulos
     setupNavigation(bot)
     setupChat(bot, () => isEating)
+    setupAwareness(bot)
 
     // Eventos Básicos
     bot.once('spawn', () => {
