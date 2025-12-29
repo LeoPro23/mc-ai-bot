@@ -1,8 +1,8 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai')
-const { 
-    MODELO_A_USAR, GEMINI_API_KEY, 
+const {
+    MODELO_A_USAR, GEMINI_API_KEY,
     USE_OLLAMA, OLLAMA_URL, OLLAMA_MODEL,
-    USE_GROQ, GROQ_API_KEY, GROQ_MODEL 
+    USE_GROQ, GROQ_API_KEY, GROQ_MODEL
 } = require('./config')
 
 let model = null
@@ -56,9 +56,9 @@ async function initAI() {
         aiMode = 'google'
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
         try {
-            model = genAI.getGenerativeModel({ 
+            model = genAI.getGenerativeModel({
                 model: MODELO_A_USAR,
-                systemInstruction: SYSTEM_PROMPT 
+                systemInstruction: SYSTEM_PROMPT
             })
             console.log(`✅ IA Lista (Google): ${MODELO_A_USAR}`)
         } catch (e) { console.error('❌ Error IA Google:', e) }
@@ -85,13 +85,18 @@ async function generateResponse(prompt) {
                 })
             })
             const data = await response.json()
-            return data.choices[0].message.content
+            if (data && data.choices && data.choices.length > 0) {
+                return data.choices[0].message.content
+            } else {
+                console.error("❌ Error Groq API (respuesta inválida):", JSON.stringify(data))
+                return "Error en API Groq (sin respuesta)."
+            }
         } catch (e) {
-            console.error("❌ Error GROQ:", e.message)
-            return "Error en conexión con Groq."
+            console.error("❌ Error conex Groq:", e.message)
+            return "Error conex Groq."
         }
     }
-    
+
     if (aiMode === 'ollama') {
         try {
             const response = await fetch(`${OLLAMA_URL}/api/chat`, {

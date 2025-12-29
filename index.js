@@ -10,6 +10,7 @@ const { irYRomper, atacarEntidad, golpearUnaVez, construirBloque, construirEstru
 const { initAI, generateResponse } = require('./src/ai')
 const { setCombatMode, combatTick, notifyOwner } = require('./src/combat')
 const { askOwnerDecision, handleOwnerResponse, requestTeleportTo, clearPendingDecision } = require('./src/interaction')
+const { getStatusReport } = require('./src/status')
 
 // Función para logs con hora
 function log(msg) {
@@ -29,21 +30,21 @@ startWebServer()
 initAI()
 
 function initBot() {
-  log(`🔄 Conectando...`)
+    log(`🔄 Conectando...`)
 
-  const bot = mineflayer.createBot({
-    host: MC_HOST,
-    port: MC_PORT,
-    username: MC_USER,
-    version: '1.21.4',
-    auth: 'offline',
-    checkTimeoutInterval: 60000 
-  })
+    const bot = mineflayer.createBot({
+        host: MC_HOST,
+        port: MC_PORT,
+        username: MC_USER,
+        version: '1.21.4',
+        auth: 'offline',
+        checkTimeoutInterval: 60000
+    })
 
-  // CARGAR PLUGINS
-  bot.loadPlugin(pathfinder)
-  bot.loadPlugin(toolPlugin)
-  bot.loadPlugin(pvp)
+    // CARGAR PLUGINS
+    bot.loadPlugin(pathfinder)
+    bot.loadPlugin(toolPlugin)
+    bot.loadPlugin(pvp)
 
     // Anti-duplicados (mismo usuario/mensaje/fuente en ventana corta)
     const recentMessages = new Map()
@@ -73,8 +74,8 @@ function initBot() {
     function stopFollow() {
         following = false
         lastFollowDist = null
-        try { clearPendingDecision() } catch {}
-        try { bot.pathfinder.setGoal(null) } catch {}
+        try { clearPendingDecision() } catch { }
+        try { bot.pathfinder.setGoal(null) } catch { }
     }
 
     function startFollow(username) {
@@ -231,63 +232,63 @@ function initBot() {
         }
     }
 
-  bot.once('spawn', () => {
-    log(`🚀 ${bot.username} conectado.`)
-    if (MC_AUTH_PASS) bot.chat(`/login ${MC_AUTH_PASS}`)
-    
-    // Configurar patrones de chat para el servidor
-    // Soporte para [Not Secure] [Rango] Usuario: Mensaje
-    try {
-        bot.chatAddPattern(/^\[Not Secure\] (?:\[.*?\] )?(\w+): (.*)$/, 'chat', 'chat_secure_fix')
-        bot.chatAddPattern(/^(?:\[.*?\] )?(\w+): (.*)$/, 'chat', 'chat_standard_fix')
-    } catch (e) {
-        log(`⚠️ Error añadiendo patrones de chat: ${e.message}`)
-    }
+    bot.once('spawn', () => {
+        log(`🚀 ${bot.username} conectado.`)
+        if (MC_AUTH_PASS) bot.chat(`/login ${MC_AUTH_PASS}`)
 
-    // Configuración de Pathfinder
-    bot.pathfinder.thinkTimeout = 10000 // Aumentado a 10s para rutas difíciles
-    bot.pathfinder.tickTimeout = 50
-    
-    try {
-        const mcData = require('minecraft-data')(bot.version)
-        const defaultMove = new Movements(bot, mcData)
-        
-        // Configuración EXTREMA para navegación vertical y saltos
-        defaultMove.canDig = false // No romper bloques para llegar a la escalera
-        defaultMove.allow1by1towers = true 
-        defaultMove.allowParkour = true 
-        defaultMove.canOpenDoors = true
-        defaultMove.canOpenGates = true
-        defaultMove.allowSprinting = true
-        defaultMove.allowFreeMotion = true 
-        defaultMove.jumpCost = 0.05 // Salto casi gratuito
-        defaultMove.climbCost = 5 // Prioridad máxima a trepar
-        
-        // Forzar que las escaleras sean transitables incluso si están un bloque arriba
-        const ladderId = mcData.blocksByName.ladder.id
-        defaultMove.exclusionAreas = [] 
-        
-        bot.pathfinder.setMovements(defaultMove)
-        bot.pvp.movements = defaultMove // Sync PVP movements for better combat navigation
-    } catch (e) {
-        log(`❌ Error configurando Movements: ${e.message}`)
-    }
-  })
-
-  // DIAGNÓSTICO DE PATHFINDER
-  let lastNoPathLog = 0
-  bot.on('path_update', (r) => {
-    if (r.status === 'noPath') {
-        if (bot.pathfinder.goal) {
-            const now = Date.now()
-            if (now - lastNoPathLog > 5000) { // Debounce 5s
-                log(`⚠️ Pathfinder: No hay ruta clara a ${bot.pathfinder.goal.x}, ${bot.pathfinder.goal.y}, ${bot.pathfinder.goal.z}`)
-                lastNoPathLog = now
-            }
-            if (following) lastNoPathAt = Date.now()
+        // Configurar patrones de chat para el servidor
+        // Soporte para [Not Secure] [Rango] Usuario: Mensaje
+        try {
+            bot.chatAddPattern(/^\[Not Secure\] (?:\[.*?\] )?(\w+): (.*)$/, 'chat', 'chat_secure_fix')
+            bot.chatAddPattern(/^(?:\[.*?\] )?(\w+): (.*)$/, 'chat', 'chat_standard_fix')
+        } catch (e) {
+            log(`⚠️ Error añadiendo patrones de chat: ${e.message}`)
         }
-    }
-  })
+
+        // Configuración de Pathfinder
+        bot.pathfinder.thinkTimeout = 10000 // Aumentado a 10s para rutas difíciles
+        bot.pathfinder.tickTimeout = 50
+
+        try {
+            const mcData = require('minecraft-data')(bot.version)
+            const defaultMove = new Movements(bot, mcData)
+
+            // Configuración EXTREMA para navegación vertical y saltos
+            defaultMove.canDig = false // No romper bloques para llegar a la escalera
+            defaultMove.allow1by1towers = true
+            defaultMove.allowParkour = true
+            defaultMove.canOpenDoors = true
+            defaultMove.canOpenGates = true
+            defaultMove.allowSprinting = true
+            defaultMove.allowFreeMotion = true
+            defaultMove.jumpCost = 0.05 // Salto casi gratuito
+            defaultMove.climbCost = 5 // Prioridad máxima a trepar
+
+            // Forzar que las escaleras sean transitables incluso si están un bloque arriba
+            const ladderId = mcData.blocksByName.ladder.id
+            defaultMove.exclusionAreas = []
+
+            bot.pathfinder.setMovements(defaultMove)
+            bot.pvp.movements = defaultMove // Sync PVP movements for better combat navigation
+        } catch (e) {
+            log(`❌ Error configurando Movements: ${e.message}`)
+        }
+    })
+
+    // DIAGNÓSTICO DE PATHFINDER
+    let lastNoPathLog = 0
+    bot.on('path_update', (r) => {
+        if (r.status === 'noPath') {
+            if (bot.pathfinder.goal) {
+                const now = Date.now()
+                if (now - lastNoPathLog > 5000) { // Debounce 5s
+                    log(`⚠️ Pathfinder: No hay ruta clara a ${bot.pathfinder.goal.x}, ${bot.pathfinder.goal.y}, ${bot.pathfinder.goal.z}`)
+                    lastNoPathLog = now
+                }
+                if (following) lastNoPathAt = Date.now()
+            }
+        }
+    })
 
     // Watchdog de seguimiento: usa escaleras SOLO si está atascado.
     // Evita "sesgo" a escaleras: no sube por ver una; solo si no progresa siguiendo al dueño.
@@ -302,7 +303,7 @@ function initBot() {
                 following = true
                 followTargetName = 'SrLeonardo'
             })
-        } catch {}
+        } catch { }
 
         if (!following) return
 
@@ -347,65 +348,65 @@ function initBot() {
         // Si no hay diferencia clara de altura, pide instrucción al dueño.
         if (yDiff > 1.8) {
             lastRescueAt = now
-            ;(async () => {
-                try {
-                    log('🧭 Seguimiento atascado: intentando subir con escalera cercana...')
-                    await climbNearestLadder(true) // Silent checking
-                } catch (e) {
-                    log(`⚠️ Rescate por escalera falló: ${e.message}`)
-                } finally {
-                    // Reintentar seguir después del rescate
-                    const t = bot.players[followTargetName]?.entity
-                    if (t) bot.pathfinder.setGoal(new goals.GoalFollow(t, 1), true)
-                    lastFollowProgressAt = Date.now()
-                    lastFollowDist = t ? t.position.distanceTo(bot.entity.position) : null
-                }
-            })()
+                ; (async () => {
+                    try {
+                        log('🧭 Seguimiento atascado: intentando subir con escalera cercana...')
+                        await climbNearestLadder(true) // Silent checking
+                    } catch (e) {
+                        log(`⚠️ Rescate por escalera falló: ${e.message}`)
+                    } finally {
+                        // Reintentar seguir después del rescate
+                        const t = bot.players[followTargetName]?.entity
+                        if (t) bot.pathfinder.setGoal(new goals.GoalFollow(t, 1), true)
+                        lastFollowProgressAt = Date.now()
+                        lastFollowDist = t ? t.position.distanceTo(bot.entity.position) : null
+                    }
+                })()
             return
         }
 
         askOwnerDecision(bot, noPathRecently ? 'noPath' : 'stuck')
     })
 
-  async function procesarMensaje(usuario, mensaje, fuente) {
-    if (usuario === bot.username) return
+    async function procesarMensaje(usuario, mensaje, fuente) {
+        if (usuario === bot.username) return
         if (!shouldProcessMessage(usuario, mensaje, fuente)) return
-    
-    const esDueño = usuario.includes('SrLeonardo')
-    const msgLower = mensaje.toLowerCase()
 
-    // Resolver decisiones pendientes del dueño (ideal para /r o /msg)
-    if (esDueño) {
-        const handled = handleOwnerResponse(
-            bot,
-            mensaje,
-            followTargetName,
-            () => {
-                const t = bot.players[followTargetName]?.entity
-                if (t) {
-                    following = true
-                    bot.pathfinder.setGoal(new goals.GoalFollow(t, 1), true)
+        const esDueño = usuario.includes('SrLeonardo')
+        const msgLower = mensaje.toLowerCase()
+
+        // Resolver decisiones pendientes del dueño (ideal para /r o /msg)
+        if (esDueño) {
+            const handled = handleOwnerResponse(
+                bot,
+                mensaje,
+                followTargetName,
+                () => {
+                    const t = bot.players[followTargetName]?.entity
+                    if (t) {
+                        following = true
+                        bot.pathfinder.setGoal(new goals.GoalFollow(t, 1), true)
+                    }
                 }
-            }
-        )
-        if (handled) return
-    }
+            )
+            if (handled) return
+        }
 
-    // COMANDO DE EMERGENCIA (Solo Dueño)
+        // COMANDO DE EMERGENCIA (Solo Dueño)
         if (esDueño && (
             msgLower === 'para' || msgLower === 'stop' || msgLower === 'quieto' ||
             msgLower.includes('deja de atacar') || msgLower.includes('deja de hacer') ||
             msgLower.includes('no hagas nada') || msgLower.includes('alto')
         )) {
-        bot.pathfinder.setGoal(null)
-        bot.stopDigging()
-        bot.pvp.stop()
-        try { setCombatMode(bot, { enabled: false, assistOwner: false, guardOwner: false, focusQuery: null }) } catch {}
-        stopBuilding()
-                stopFollow()
-        bot.chat("Me detengo.")
-        return
-    }
+            bot.pathfinder.setGoal(null)
+            bot.stopDigging()
+            bot.pvp.stop()
+            try { setCombatMode(bot, { enabled: false, assistOwner: false, guardOwner: false, focusQuery: null }) } catch { }
+            stopBuilding()
+            stopFollow()
+            bot.chat("Me detengo.")
+            return
+        }
 
         // Atajos del dueño (sin depender de la IA)
         if (esDueño) {
@@ -433,34 +434,38 @@ function initBot() {
                 requestTeleportTo(bot, usuario)
                 return
             }
-            if (/(^|\b)(sube|subelas|usa las escaleras|escalera)\b/i.test(mensaje) && !/(\d+)/.test(mensaje)) {
-                // Si pide subir y hay escalera cerca, intentar subirla.
+            if (/(^|\b)(sube|subelas|usa las escaleras|escalera)\b/i.test(mensaje)) {
                 await climbNearestLadder()
+                return
+            }
+            if (/(^|\b)(estado|status|reporte)\b/i.test(mensaje)) {
+                const report = getStatusReport(bot, following, followTargetName, isEating)
+                bot.chat(report)
                 return
             }
         }
 
-    const mencionaBot = msgLower.includes('pollo') || msgLower.includes(bot.username.toLowerCase())
-    const esPrivado = fuente === 'whisper' || mensaje.includes('-> me')
+        const mencionaBot = msgLower.includes('pollo') || msgLower.includes(bot.username.toLowerCase())
+        const esPrivado = fuente === 'whisper' || mensaje.includes('-> me')
 
-    if (mencionaBot || esPrivado) {
-        log(`⚡ PROCESANDO de ${usuario} (${esDueño ? 'Dueño' : 'Invitado'}): "${mensaje}"`)
-        
-        const p = bot.entity.position
-        const myY = Math.floor(p.y)
-        const target = bot.players['SrLeonardo']?.entity
-        const dx = target ? (target.position.x - p.x) : 0
-        const dz = target ? (target.position.z - p.z) : 0
-        const dist = target ? Math.floor(target.position.distanceTo(p)) : null
-        const yDiff = target ? Math.floor(target.position.y - p.y) : null
-        const dir = target ? cardinalFromDelta(dx, dz) : null
-        
-        const entorno = escanearEntorno(bot)
+        if (mencionaBot || esPrivado) {
+            log(`⚡ PROCESANDO de ${usuario} (${esDueño ? 'Dueño' : 'Invitado'}): "${mensaje}"`)
 
-        chatHistory.push(`${usuario}: ${mensaje}`)
-        if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
+            const p = bot.entity.position
+            const myY = Math.floor(p.y)
+            const target = bot.players['SrLeonardo']?.entity
+            const dx = target ? (target.position.x - p.x) : 0
+            const dz = target ? (target.position.z - p.z) : 0
+            const dist = target ? Math.floor(target.position.distanceTo(p)) : null
+            const yDiff = target ? Math.floor(target.position.y - p.y) : null
+            const dir = target ? cardinalFromDelta(dx, dz) : null
 
-        const prompt = `ESTADO ACTUAL:
+            const entorno = escanearEntorno(bot)
+
+            chatHistory.push(`${usuario}: ${mensaje}`)
+            if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
+
+            const prompt = `ESTADO ACTUAL:
     - Mi nivel Y: ${myY}
     - Dueño: ${target ? `a ${dist}m hacia ${dir}${yDiff !== null ? (yDiff > 1 ? `, arriba ${yDiff}` : yDiff < -1 ? `, abajo ${Math.abs(yDiff)}` : '') : ''}` : 'no visible'}
     - Visión (sin coordenadas): ${entorno}
@@ -469,270 +474,270 @@ function initBot() {
 USUARIO ACTUAL: ${usuario} (${esDueño ? 'ES EL DUEÑO' : 'NO ES EL DUEÑO'})
 MENSAJE: "${mensaje}"`
 
-        try {
-            const response = await generateResponse(prompt)
-            log(`💬 IA: ${response}`)
+            try {
+                const response = await generateResponse(prompt)
+                log(`💬 IA: ${response}`)
 
-            // 1. Extraer y limpiar el mensaje de texto (sin comandos # y sin coordenadas)
-            let textoLimpio = stripCommandLines(response).trim()
-            textoLimpio = stripCoords(textoLimpio).trim()
+                // 1. Extraer y limpiar el mensaje de texto (sin comandos # y sin coordenadas)
+                let textoLimpio = stripCommandLines(response).trim()
+                textoLimpio = stripCoords(textoLimpio).trim()
 
-            // Nunca enviar comandos con "/" si vienen de la IA (evita /tpa que termina en help/spam)
-            if (textoLimpio && isSlashCommand(textoLimpio)) {
-                textoLimpio = ''
-            }
-            
-            // Limpiar conectores huérfanos y puntuación sobrante
-            textoLimpio = textoLimpio.replace(/\s+/g, ' ')
-            textoLimpio = textoLimpio.replace(/\b(y luego|y después|y)\b\s*[.,]?\s*$/gi, '').trim()
-            textoLimpio = textoLimpio.replace(/[.,\s]+$/, '').trim()
-            textoLimpio = textoLimpio.replace(/^[,.\s]+/, '')
+                // Nunca enviar comandos con "/" si vienen de la IA (evita /tpa que termina en help/spam)
+                if (textoLimpio && isSlashCommand(textoLimpio)) {
+                    textoLimpio = ''
+                }
 
-            if (textoLimpio) {
-                bot.chat(textoLimpio.replace(/\n/g, ' '))
-                chatHistory.push(`Pollovis: ${textoLimpio}`)
-            }
+                // Limpiar conectores huérfanos y puntuación sobrante
+                textoLimpio = textoLimpio.replace(/\s+/g, ' ')
+                textoLimpio = textoLimpio.replace(/\b(y luego|y después|y)\b\s*[.,]?\s*$/gi, '').trim()
+                textoLimpio = textoLimpio.replace(/[.,\s]+$/, '').trim()
+                textoLimpio = textoLimpio.replace(/^[,.\s]+/, '')
 
-            // 2. Ejecutar Comandos (SOLO SI ES EL DUEÑO)
-            if (esDueño) {
-                // #WAR ON/OFF (modo guerra)
-                if (response.includes('#WAR')) {
-                    const m = response.match(/#WAR\s+(ON|OFF)/i)
-                    if (m && m[1] && m[1].toUpperCase() === 'ON') {
-                        setCombatMode(bot, { enabled: true, assistOwner: true, guardOwner: true })
-                        notifyOwner(bot, 'Modo guerra activado.')
-                    } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
-                        setCombatMode(bot, { enabled: false, assistOwner: false, guardOwner: false, focusQuery: null })
-                        notifyOwner(bot, 'Modo guerra desactivado.')
+                if (textoLimpio) {
+                    bot.chat(textoLimpio.replace(/\n/g, ' '))
+                    chatHistory.push(`Pollovis: ${textoLimpio}`)
+                }
+
+                // 2. Ejecutar Comandos (SOLO SI ES EL DUEÑO)
+                if (esDueño) {
+                    // #WAR ON/OFF (modo guerra)
+                    if (response.includes('#WAR')) {
+                        const m = response.match(/#WAR\s+(ON|OFF)/i)
+                        if (m && m[1] && m[1].toUpperCase() === 'ON') {
+                            setCombatMode(bot, { enabled: true, assistOwner: true, guardOwner: true })
+                            notifyOwner(bot, 'Modo guerra activado.')
+                        } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
+                            setCombatMode(bot, { enabled: false, assistOwner: false, guardOwner: false, focusQuery: null })
+                            notifyOwner(bot, 'Modo guerra desactivado.')
+                        }
                     }
-                }
 
-                // #ASSIST ON/OFF
-                if (response.includes('#ASSIST')) {
-                    const m = response.match(/#ASSIST\s+(ON|OFF)/i)
-                    if (m && m[1] && m[1].toUpperCase() === 'ON') {
-                        setCombatMode(bot, { enabled: true, assistOwner: true })
-                        notifyOwner(bot, 'Asistencia activada (solo mobs hostiles).')
-                    } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
-                        setCombatMode(bot, { assistOwner: false })
-                        notifyOwner(bot, 'Asistencia desactivada.')
+                    // #ASSIST ON/OFF
+                    if (response.includes('#ASSIST')) {
+                        const m = response.match(/#ASSIST\s+(ON|OFF)/i)
+                        if (m && m[1] && m[1].toUpperCase() === 'ON') {
+                            setCombatMode(bot, { enabled: true, assistOwner: true })
+                            notifyOwner(bot, 'Asistencia activada (solo mobs hostiles).')
+                        } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
+                            setCombatMode(bot, { assistOwner: false })
+                            notifyOwner(bot, 'Asistencia desactivada.')
+                        }
                     }
-                }
 
-                // #GUARD ON/OFF
-                if (response.includes('#GUARD')) {
-                    const m = response.match(/#GUARD\s+(ON|OFF)/i)
-                    if (m && m[1] && m[1].toUpperCase() === 'ON') {
-                        setCombatMode(bot, { enabled: true, guardOwner: true })
-                        notifyOwner(bot, 'Guardia activada (me quedo cerca de ti).')
-                    } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
-                        setCombatMode(bot, { guardOwner: false })
-                        notifyOwner(bot, 'Guardia desactivada.')
+                    // #GUARD ON/OFF
+                    if (response.includes('#GUARD')) {
+                        const m = response.match(/#GUARD\s+(ON|OFF)/i)
+                        if (m && m[1] && m[1].toUpperCase() === 'ON') {
+                            setCombatMode(bot, { enabled: true, guardOwner: true })
+                            notifyOwner(bot, 'Guardia activada (me quedo cerca de ti).')
+                        } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
+                            setCombatMode(bot, { guardOwner: false })
+                            notifyOwner(bot, 'Guardia desactivada.')
+                        }
                     }
-                }
 
-                // #FOCUS query
-                if (response.includes('#FOCUS')) {
-                    const m = response.match(/#FOCUS\s+([^#\n\r]+)/i)
-                    if (m && m[1]) {
-                        setCombatMode(bot, { enabled: true, assistOwner: true, guardOwner: true, focusQuery: m[1].trim() })
-                        notifyOwner(bot, `Focus: ${m[1].trim()}`)
+                    // #FOCUS query
+                    if (response.includes('#FOCUS')) {
+                        const m = response.match(/#FOCUS\s+([^#\n\r]+)/i)
+                        if (m && m[1]) {
+                            setCombatMode(bot, { enabled: true, assistOwner: true, guardOwner: true, focusQuery: m[1].trim() })
+                            notifyOwner(bot, `Focus: ${m[1].trim()}`)
+                        }
                     }
-                }
 
-                // #UNFOCUS
-                if (response.includes('#UNFOCUS')) {
-                    setCombatMode(bot, { focusQuery: null })
-                    notifyOwner(bot, 'Focus limpiado.')
-                }
+                    // #UNFOCUS
+                    if (response.includes('#UNFOCUS')) {
+                        setCombatMode(bot, { focusQuery: null })
+                        notifyOwner(bot, 'Focus limpiado.')
+                    }
 
-                // #ASK_TP (propuesta de teleport con aprobación)
-                if (response.includes('#ASK_TP')) {
-                    const m = response.match(/#ASK_TP\s+(\w+)?/i)
-                    const targetName = (m && m[1]) ? m[1] : 'SrLeonardo'
-                    askOwnerDecision(bot, 'ai_ask_tp', { action: 'tpa', targetName })
-                }
+                    // #ASK_TP (propuesta de teleport con aprobación)
+                    if (response.includes('#ASK_TP')) {
+                        const m = response.match(/#ASK_TP\s+(\w+)?/i)
+                        const targetName = (m && m[1]) ? m[1] : 'SrLeonardo'
+                        askOwnerDecision(bot, 'ai_ask_tp', { action: 'tpa', targetName })
+                    }
 
-                // #TPA (ejecuta solicitud /tpa directamente)
-                if (response.includes('#TPA')) {
-                    const m = response.match(/#TPA\s+(\w+)?/i)
-                    const targetName = (m && m[1]) ? m[1] : 'SrLeonardo'
-                    requestTeleportTo(bot, targetName)
-                }
+                    // #TPA (ejecuta solicitud /tpa directamente)
+                    if (response.includes('#TPA')) {
+                        const m = response.match(/#TPA\s+(\w+)?/i)
+                        const targetName = (m && m[1]) ? m[1] : 'SrLeonardo'
+                        requestTeleportTo(bot, targetName)
+                    }
 
-                // #FOLLOW
-                if (response.includes('#FOLLOW')) {
-                    const m = response.match(/#FOLLOW\s+(\w+)?/i)
-                    startFollow((m && m[1]) ? m[1] : 'SrLeonardo')
-                }
+                    // #FOLLOW
+                    if (response.includes('#FOLLOW')) {
+                        const m = response.match(/#FOLLOW\s+(\w+)?/i)
+                        startFollow((m && m[1]) ? m[1] : 'SrLeonardo')
+                    }
 
-                // #CLIMB (subir escalera cercana)
-                if (response.includes('#CLIMB')) {
-                    await climbNearestLadder()
-                }
+                    // #CLIMB (subir escalera cercana)
+                    if (response.includes('#CLIMB')) {
+                        await climbNearestLadder()
+                    }
 
-                // #GOTO (Soporta múltiples destinos secuenciales)
-                if (response.includes('#GOTO')) {
-                    const matches = Array.from(response.matchAll(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/gi))
-                    if (matches.length > 0) {
-                        (async () => {
-                            for (let i = 0; i < matches.length; i++) {
-                                const match = matches[i]
-                                const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                                try {
-                                    log(`📍 Navegando a punto ${i+1}: ${x}, ${y}, ${z}`)
-                                    // El primer punto (aproximación) es más flexible, el último (top) es exacto
-                                    const goal = (i === matches.length - 1) ? new goals.GoalBlock(x, y, z) : new goals.GoalNear(x, y, z, 0.8)
-                                    await bot.pathfinder.goto(goal)
-                                } catch (e) {
-                                    log(`⚠️ No pude llegar al punto ${i+1}: ${e.message}`)
-                                    
-                                    // FALLBACK: Subida manual si falla el pathfinder y es un punto alto
-                                    if (i === matches.length - 1 && y > bot.entity.position.y) {
-                                        log("🧗 Activando ESCALADA MANUAL de emergencia...")
-                                        await escaladaManualHacia(x, y, z)
-                                        log("🧗 Fin de maniobra manual.")
+                    // #GOTO (Soporta múltiples destinos secuenciales)
+                    if (response.includes('#GOTO')) {
+                        const matches = Array.from(response.matchAll(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/gi))
+                        if (matches.length > 0) {
+                            (async () => {
+                                for (let i = 0; i < matches.length; i++) {
+                                    const match = matches[i]
+                                    const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
+                                    try {
+                                        log(`📍 Navegando a punto ${i + 1}: ${x}, ${y}, ${z}`)
+                                        // El primer punto (aproximación) es más flexible, el último (top) es exacto
+                                        const goal = (i === matches.length - 1) ? new goals.GoalBlock(x, y, z) : new goals.GoalNear(x, y, z, 0.8)
+                                        await bot.pathfinder.goto(goal)
+                                    } catch (e) {
+                                        log(`⚠️ No pude llegar al punto ${i + 1}: ${e.message}`)
+
+                                        // FALLBACK: Subida manual si falla el pathfinder y es un punto alto
+                                        if (i === matches.length - 1 && y > bot.entity.position.y) {
+                                            log("🧗 Activando ESCALADA MANUAL de emergencia...")
+                                            await escaladaManualHacia(x, y, z)
+                                            log("🧗 Fin de maniobra manual.")
+                                        }
                                     }
                                 }
-                            }
-                        })()
+                            })()
+                        }
                     }
-                } 
-                
-                // #MINE
-                if (response.includes('#MINE')) {
-                    const match = response.match(/#MINE\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
-                    if (match) {
-                        const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                        irYRomper(bot, x, y, z)
+
+                    // #MINE
+                    if (response.includes('#MINE')) {
+                        const match = response.match(/#MINE\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
+                        if (match) {
+                            const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
+                            irYRomper(bot, x, y, z)
+                        }
                     }
-                }
 
-                // #KILL
-                if (response.includes('#KILL')) {
-                    const match = response.match(/#KILL\s+(\w+)/i)
-                    if (match) {
-                        atacarEntidad(bot, match[1])
+                    // #KILL
+                    if (response.includes('#KILL')) {
+                        const match = response.match(/#KILL\s+(\w+)/i)
+                        if (match) {
+                            atacarEntidad(bot, match[1])
+                        }
                     }
-                }
 
-                // #HIT (un golpe)
-                if (response.includes('#HIT')) {
-                    const match = response.match(/#HIT\s+(\w+)/i)
-                    if (match) {
-                        golpearUnaVez(bot, match[1])
+                    // #HIT (un golpe)
+                    if (response.includes('#HIT')) {
+                        const match = response.match(/#HIT\s+(\w+)/i)
+                        if (match) {
+                            golpearUnaVez(bot, match[1])
+                        }
                     }
-                }
 
-                // #BUILD
-                if (response.includes('#BUILD')) {
-                    const match = response.match(/#BUILD\s+(\w+)\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
-                    if (match) {
-                        const tipo = match[1], x = parseInt(match[2]), y = parseInt(match[3]), z = parseInt(match[4])
-                        construirBloque(bot, tipo, x, y, z)
+                    // #BUILD
+                    if (response.includes('#BUILD')) {
+                        const match = response.match(/#BUILD\s+(\w+)\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
+                        if (match) {
+                            const tipo = match[1], x = parseInt(match[2]), y = parseInt(match[3]), z = parseInt(match[4])
+                            construirBloque(bot, tipo, x, y, z)
+                        }
                     }
-                }
 
-                // #HOUSE
-                if (response.includes('#HOUSE')) {
-                    const p = bot.entity.position
-                    construirEstructura(bot, 'casa', Math.floor(p.x) + 1, Math.floor(p.y), Math.floor(p.z) + 1)
-                }
-
-                // #PATH
-                if (response.includes('#PATH')) {
-                    const match = response.match(/#PATH\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\w+)/i)
-                    if (match) {
-                        const x1 = parseInt(match[1]), y1 = parseInt(match[2]), z1 = parseInt(match[3])
-                        const x2 = parseInt(match[4]), y2 = parseInt(match[5]), z2 = parseInt(match[6])
-                        const tipo = match[7]
-                        construirCamino(bot, x1, y1, z1, x2, y2, z2, tipo)
+                    // #HOUSE
+                    if (response.includes('#HOUSE')) {
+                        const p = bot.entity.position
+                        construirEstructura(bot, 'casa', Math.floor(p.x) + 1, Math.floor(p.y), Math.floor(p.z) + 1)
                     }
+
+                    // #PATH
+                    if (response.includes('#PATH')) {
+                        const match = response.match(/#PATH\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\w+)/i)
+                        if (match) {
+                            const x1 = parseInt(match[1]), y1 = parseInt(match[2]), z1 = parseInt(match[3])
+                            const x2 = parseInt(match[4]), y2 = parseInt(match[5]), z2 = parseInt(match[6])
+                            const tipo = match[7]
+                            construirCamino(bot, x1, y1, z1, x2, y2, z2, tipo)
+                        }
+                    }
+
+                    // #SCAN
+                    if (response.includes('#SCAN')) {
+                        escanearEstructura(bot, 5)
+                    }
+
+                    // #CLONE
+                    if (response.includes('#CLONE')) {
+                        clonarEstructura(bot)
+                    }
+                } else if (response.includes('#')) {
+                    log(`⚠️ Intento de comando bloqueado para usuario: ${usuario}`)
                 }
 
-                // #SCAN
-                if (response.includes('#SCAN')) {
-                    escanearEstructura(bot, 5)
-                }
-
-                // #CLONE
-                if (response.includes('#CLONE')) {
-                    clonarEstructura(bot)
-                }
-            } else if (response.includes('#')) {
-                log(`⚠️ Intento de comando bloqueado para usuario: ${usuario}`)
-            }
-
-        } catch (e) { 
-            log(`❌ Error API: ${e.message}`)
-            bot.chat("Error cerebral.")
-        }
-    }
-  }
-
-  // EVENTOS
-  bot.on('chat', (u, m) => procesarMensaje(u, m, 'chat'))
-  bot.on('whisper', (u, m) => procesarMensaje(u, m, 'whisper'))
-  
-  bot.on('messagestr', (msg) => {
-    // Log para debug
-    if (!msg.includes(bot.username)) log(`📩 Mensaje recibido: "${msg}"`)
-
-    // Ignorar mensajes que claramente vienen del bot (evitar bucles)
-    // Asumimos que el bot tiene un prefijo o formato estándar
-    if (msg.startsWith(`[Pollo] ${bot.username}`) || msg.startsWith(`${bot.username}:`)) return
-
-    // Fallback para Chat Global si el evento 'chat' no se disparó
-    // Intentamos parsear manualmente si vemos estructura de chat
-    const chatMatch = msg.match(/(?:\[.*?\]\s*)*(\w+)\s*:\s*(.*)/)
-    if (chatMatch) {
-        const usuario = chatMatch[1]
-        const contenido = chatMatch[2]
-        
-        // Evitar procesar mensajes del sistema, logs o del propio bot (si se escapó del filtro de arriba)
-        if (usuario === 'Server' || usuario === 'INFO' || usuario === 'WARN' || usuario === bot.username) return
-        
-        // Si ya tenemos un patrón de chat configurado, el evento 'chat' lo manejará.
-        // Pero por si acaso, verificamos si el contenido menciona al bot
-        if (contenido.toLowerCase().includes(bot.username.toLowerCase()) || contenido.toLowerCase().includes('pollo')) {
-             // Solo procesamos aquí si NO se disparó el evento 'chat' (difícil de saber, pero no hace daño duplicar si hay debounce)
-             // Para evitar duplicados, confiamos en que procesarMensaje maneje el historial o que chatAddPattern funcione.
-             // Por seguridad, dejaremos que 'chat' maneje lo estándar y esto sea solo para formatos muy raros.
-        }
-    }
-  })
-
-  bot.on('error', (e) => log(`Error: ${e}`))
-  
-  // AUTO-COMER
-  let isEating = false
-  bot.on('health', async () => {
-    if (isEating) return
-    if (bot.food < 15) {
-        const food = bot.inventory.items().find(item => {
-            const data = require('minecraft-data')(bot.version).foodsByName[item.name]
-            return data !== undefined
-        })
-        if (food) {
-            try {
-                isEating = true
-                await bot.equip(food, 'hand')
-                await bot.consume()
-            } catch (err) {
-                 if (err.message !== 'Consuming cancelled due to calling bot.consume() again') {
-                     log(`⚠️ Error comiendo: ${err.message}`)
-                 }
-            } finally {
-                isEating = false
+            } catch (e) {
+                log(`❌ Error API: ${e.message}`)
+                bot.chat("Error cerebral.")
             }
         }
     }
-  })
 
-  bot.on('end', () => {
-    log('Desconectado. Reconectando...')
-    setTimeout(initBot, 10000)
-  })
+    // EVENTOS
+    bot.on('chat', (u, m) => procesarMensaje(u, m, 'chat'))
+    bot.on('whisper', (u, m) => procesarMensaje(u, m, 'whisper'))
+
+    bot.on('messagestr', (msg) => {
+        // Log para debug
+        if (!msg.includes(bot.username)) log(`📩 Mensaje recibido: "${msg}"`)
+
+        // Ignorar mensajes que claramente vienen del bot (evitar bucles)
+        // Asumimos que el bot tiene un prefijo o formato estándar
+        if (msg.startsWith(`[Pollo] ${bot.username}`) || msg.startsWith(`${bot.username}:`)) return
+
+        // Fallback para Chat Global si el evento 'chat' no se disparó
+        // Intentamos parsear manualmente si vemos estructura de chat
+        const chatMatch = msg.match(/(?:\[.*?\]\s*)*(\w+)\s*:\s*(.*)/)
+        if (chatMatch) {
+            const usuario = chatMatch[1]
+            const contenido = chatMatch[2]
+
+            // Evitar procesar mensajes del sistema, logs o del propio bot (si se escapó del filtro de arriba)
+            if (usuario === 'Server' || usuario === 'INFO' || usuario === 'WARN' || usuario === bot.username) return
+
+            // Si ya tenemos un patrón de chat configurado, el evento 'chat' lo manejará.
+            // Pero por si acaso, verificamos si el contenido menciona al bot
+            if (contenido.toLowerCase().includes(bot.username.toLowerCase()) || contenido.toLowerCase().includes('pollo')) {
+                // Solo procesamos aquí si NO se disparó el evento 'chat' (difícil de saber, pero no hace daño duplicar si hay debounce)
+                // Para evitar duplicados, confiamos en que procesarMensaje maneje el historial o que chatAddPattern funcione.
+                // Por seguridad, dejaremos que 'chat' maneje lo estándar y esto sea solo para formatos muy raros.
+            }
+        }
+    })
+
+    bot.on('error', (e) => log(`Error: ${e}`))
+
+    // AUTO-COMER
+    let isEating = false
+    bot.on('health', async () => {
+        if (isEating) return
+        if (bot.food < 15) {
+            const food = bot.inventory.items().find(item => {
+                const data = require('minecraft-data')(bot.version).foodsByName[item.name]
+                return data !== undefined
+            })
+            if (food) {
+                try {
+                    isEating = true
+                    await bot.equip(food, 'hand')
+                    await bot.consume()
+                } catch (err) {
+                    if (err.message !== 'Consuming cancelled due to calling bot.consume() again') {
+                        log(`⚠️ Error comiendo: ${err.message}`)
+                    }
+                } finally {
+                    isEating = false
+                }
+            }
+        }
+    })
+
+    bot.on('end', () => {
+        log('Desconectado. Reconectando...')
+        setTimeout(initBot, 10000)
+    })
 }
 
 initBot()
