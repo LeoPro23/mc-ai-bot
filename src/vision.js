@@ -71,7 +71,8 @@ function escanearEntorno(bot) {
 
         if (!approach) approach = lowest
         
-        ladderInfo = `ESCALERA(Aproximar:x:${approach.x},y:${approach.y},z:${approach.z} | Top:x:${highest.x},y:${highest.y+1},z:${highest.z}). `
+        const altura = (highest.y + 1) - approach.y
+        ladderInfo = `ESCALERA(altura:${altura}). `
     }
 
     // 2. Bloques de Interés (Recursos)
