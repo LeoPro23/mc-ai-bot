@@ -23,7 +23,9 @@ REGLAS DE ORO (SEGURIDAD Y JERARQUÍA):
 11. #CLONE: Construye lo escaneado. Solo para SrLeonardo.
 12. Comandos de servidor (/tpa, /home) SIN el símbolo #.
 13. VERTICALIDAD: Usa "ESCALERA(Base:... | Top:...)" para subir/bajar.
-14. Si te regañan, pide perdón. Describe la VISION sin dar coordenadas numéricas.`
+14. Si te regañan, pide perdón. Describe la VISION sin dar coordenadas numéricas.
+15. Si no ves una entidad en la VISION, no asumas que ha muerto, simplemente di que no la ves cerca.
+16. Los aldeanos, animales y monstruos aparecen en la VISION por su nombre. Si ves uno, puedes interactuar con él.`
 
 async function initAI() {
     if (USE_GROQ && GROQ_API_KEY) {
