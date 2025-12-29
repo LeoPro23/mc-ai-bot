@@ -80,10 +80,7 @@ function initBot() {
   bot.on('path_update', (r) => {
     if (r.status === 'noPath') {
         if (bot.pathfinder.goal) {
-            const msg = "No encuentro camino para llegar ahí."
-            bot.chat(msg)
-            chatHistory.push(`Pollovis: ${msg}`)
-            if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
+            log(`⚠️ Pathfinder: No hay ruta clara a ${bot.pathfinder.goal.x}, ${bot.pathfinder.goal.y}, ${bot.pathfinder.goal.z}`)
         }
     }
   })
@@ -139,6 +136,11 @@ MENSAJE: "${mensaje}"`
             
             // SEGURIDAD: Eliminar cualquier patrón de coordenadas (3 números seguidos) para no exponer la base
             textoLimpio = textoLimpio.replace(/-?\d+[,\s]+-?\d+[,\s]+-?\d+/g, '').trim()
+            
+            // Limpiar conectores huérfanos y puntuación sobrante
+            textoLimpio = textoLimpio.replace(/\s+/g, ' ')
+            textoLimpio = textoLimpio.replace(/\b(y luego|y después|y)\b\s*[.,]?\s*$/gi, '').trim()
+            textoLimpio = textoLimpio.replace(/[.,\s]+$/, '').trim()
             textoLimpio = textoLimpio.replace(/^[,.\s]+/, '')
 
             if (textoLimpio) {
@@ -148,13 +150,21 @@ MENSAJE: "${mensaje}"`
 
             // 2. Ejecutar Comandos (SOLO SI ES EL DUEÑO)
             if (esDueño) {
-                // #GOTO
+                // #GOTO (Soporta múltiples destinos secuenciales)
                 if (response.includes('#GOTO')) {
-                    const matches = response.matchAll(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/gi)
-                    for (const match of matches) {
-                        const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                        // Usar GoalNear para la base y GoalBlock para el top
-                        bot.pathfinder.setGoal(new goals.GoalNear(x, y, z, 0.5))
+                    const matches = Array.from(response.matchAll(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/gi))
+                    if (matches.length > 0) {
+                        (async () => {
+                            for (const match of matches) {
+                                const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
+                                try {
+                                    log(`📍 Navegando a: ${x}, ${y}, ${z}`)
+                                    await bot.pathfinder.goto(new goals.GoalNear(x, y, z, 0.2))
+                                } catch (e) {
+                                    log(`⚠️ No pude llegar a un punto intermedio: ${e.message}`)
+                                }
+                            }
+                        })()
                     }
                 } 
                 
