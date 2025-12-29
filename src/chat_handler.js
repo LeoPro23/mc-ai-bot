@@ -343,6 +343,13 @@ function setupChat(bot, isEatingFn) {
                 // processed by chat pattern usually
             }
         }
+
+        // AUTO-ACCEPT TP REQUESTS FROM OWNER
+        if (msg.includes('SrLeonardo has requested to teleport to you') ||
+            msg.includes('SrLeonardo has requested that you teleport to them')) {
+            console.log('⚡ Auto-aceptando TP de SrLeonardo...')
+            bot.chat('/tpaccept')
+        }
     })
 }
 
