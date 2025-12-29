@@ -33,7 +33,21 @@ function escanearEntorno(bot) {
     if (ladders.length > 0) {
         const highest = ladders.reduce((prev, current) => (prev.y > current.y) ? prev : current)
         const lowest = ladders.reduce((prev, current) => (prev.y < current.y) ? prev : current)
-        ladderInfo = `ESCALERA(Base:x:${lowest.x},y:${lowest.y},z:${lowest.z} | Top:x:${highest.x},y:${highest.y+1},z:${highest.z}). `
+        
+        // Encontrar punto de aproximación (bloque de aire frente a la base)
+        const neighbors = [
+            {x:1, z:0}, {x:-1, z:0}, {x:0, z:1}, {x:0, z:-1}
+        ]
+        let approach = lowest
+        for (const n of neighbors) {
+            const p = lowest.offset(n.x, 0, n.z)
+            if (bot.blockAt(p).name === 'air') {
+                approach = p
+                break
+            }
+        }
+        
+        ladderInfo = `ESCALERA(Aproximar:x:${approach.x},y:${approach.y},z:${approach.z} | Top:x:${highest.x},y:${highest.y+1},z:${highest.z}). `
     }
 
     // 2. Bloques de Interés (Recursos)

@@ -54,21 +54,20 @@ function initBot() {
         const mcData = require('minecraft-data')(bot.version)
         const defaultMove = new Movements(bot, mcData)
         
-        // Configuración agresiva para navegación
-        defaultMove.canDig = true 
-        defaultMove.digCost = 1000 
+        // Configuración EXTREMA para navegación vertical y saltos
+        defaultMove.canDig = false // No romper bloques para llegar a la escalera
         defaultMove.allow1by1towers = true 
         defaultMove.allowParkour = true 
         defaultMove.canOpenDoors = true
         defaultMove.canOpenGates = true
         defaultMove.allowSprinting = true
         defaultMove.allowFreeMotion = true 
-        defaultMove.jumpCost = 0.1 
-        defaultMove.climbCost = 10 
+        defaultMove.jumpCost = 0.05 // Salto casi gratuito
+        defaultMove.climbCost = 5 // Prioridad máxima a trepar
         
         // Forzar que las escaleras sean transitables incluso si están un bloque arriba
         const ladderId = mcData.blocksByName.ladder.id
-        defaultMove.exclusionAreas = [] // Limpiar áreas de exclusión
+        defaultMove.exclusionAreas = [] 
         
         bot.pathfinder.setMovements(defaultMove)
     } catch (e) {
@@ -155,13 +154,16 @@ MENSAJE: "${mensaje}"`
                     const matches = Array.from(response.matchAll(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/gi))
                     if (matches.length > 0) {
                         (async () => {
-                            for (const match of matches) {
+                            for (let i = 0; i < matches.length; i++) {
+                                const match = matches[i]
                                 const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
                                 try {
-                                    log(`📍 Navegando a: ${x}, ${y}, ${z}`)
-                                    await bot.pathfinder.goto(new goals.GoalNear(x, y, z, 0.2))
+                                    log(`📍 Navegando a punto ${i+1}: ${x}, ${y}, ${z}`)
+                                    // El primer punto (aproximación) es más flexible, el último (top) es exacto
+                                    const goal = (i === matches.length - 1) ? new goals.GoalBlock(x, y, z) : new goals.GoalNear(x, y, z, 0.8)
+                                    await bot.pathfinder.goto(goal)
                                 } catch (e) {
-                                    log(`⚠️ No pude llegar a un punto intermedio: ${e.message}`)
+                                    log(`⚠️ No pude llegar al punto ${i+1}: ${e.message}`)
                                 }
                             }
                         })()
