@@ -1,5 +1,6 @@
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
+const Vec3 = require('vec3')
 const toolPlugin = require('mineflayer-tool').plugin
 const pvp = require('mineflayer-pvp').plugin
 const { MC_HOST, MC_PORT, MC_USER, MC_AUTH_PASS, MAX_HISTORY } = require('./src/config')
@@ -164,6 +165,32 @@ MENSAJE: "${mensaje}"`
                                     await bot.pathfinder.goto(goal)
                                 } catch (e) {
                                     log(`⚠️ No pude llegar al punto ${i+1}: ${e.message}`)
+                                    
+                                    // FALLBACK: Subida manual si falla el pathfinder y es un punto alto
+                                    if (i === matches.length - 1 && y > bot.entity.position.y) {
+                                        log("🧗 Activando ESCALADA MANUAL de emergencia...")
+                                        bot.pathfinder.setGoal(null)
+                                        
+                                        const targetPos = new Vec3(x, y, z)
+                                        await bot.lookAt(targetPos)
+                                        
+                                        // 1. Salto inicial hacia la escalera
+                                        bot.setControlState('forward', true)
+                                        bot.setControlState('jump', true)
+                                        await bot.waitForTicks(10) // 0.5s impulso
+                                        bot.setControlState('jump', false)
+                                        
+                                        // 2. Subir mirando hacia arriba
+                                        const timeout = Date.now() + 5000 // Máximo 5 segundos intentando subir
+                                        while (bot.entity.position.y < y && Date.now() < timeout) {
+                                            // Mirar ligeramente hacia arriba para asegurar subida
+                                            await bot.lookAt(new Vec3(x, y + 1, z)) 
+                                            await bot.waitForTicks(5)
+                                        }
+                                        
+                                        bot.setControlState('forward', false)
+                                        log("🧗 Fin de maniobra manual.")
+                                    }
                                 }
                             }
                         })()
