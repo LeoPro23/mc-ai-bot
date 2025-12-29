@@ -43,7 +43,7 @@ function isSlashCommand(text) {
 
 const recentMessages = new Map()
 function shouldProcessMessage(usuario, mensaje, fuente) {
-    const key = `${fuente}:${usuario}:${mensaje}`
+    const key = `${usuario}:${mensaje}`
     const now = Date.now()
     const last = recentMessages.get(key)
     if (last && (now - last) < 900) return false
