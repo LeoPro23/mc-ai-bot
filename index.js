@@ -47,23 +47,27 @@ function initBot() {
     if (MC_AUTH_PASS) bot.chat(`/login ${MC_AUTH_PASS}`)
     
     // Configuración de Pathfinder
-    bot.pathfinder.thinkTimeout = 5000 // Más tiempo para pensar caminos complejos
-    bot.pathfinder.tickTimeout = 100
+    bot.pathfinder.thinkTimeout = 10000 // Aumentado a 10s para rutas difíciles
+    bot.pathfinder.tickTimeout = 50
     
     try {
         const mcData = require('minecraft-data')(bot.version)
         const defaultMove = new Movements(bot, mcData)
         
-        // MANTENEMOS ESTO PARA QUE CAMINE SIN ROMPER TU CASA
-        defaultMove.canDig = false 
-        defaultMove.allow1by1towers = false 
+        // Configuración agresiva para navegación
+        defaultMove.canDig = true 
+        defaultMove.digCost = 1000 
+        defaultMove.allow1by1towers = true 
         defaultMove.allowParkour = true 
         defaultMove.canOpenDoors = true
         defaultMove.canOpenGates = true
         defaultMove.allowSprinting = true
+        defaultMove.allowFreeMotion = true // Ayuda en escaleras y huecos
         
         bot.pathfinder.setMovements(defaultMove)
-    } catch (e) {}
+    } catch (e) {
+        log(`❌ Error configurando Movements: ${e.message}`)
+    }
   })
 
   // DIAGNÓSTICO DE PATHFINDER

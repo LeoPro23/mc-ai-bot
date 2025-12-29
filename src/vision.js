@@ -44,7 +44,7 @@ function escanearEntorno(bot) {
         return a.distanceTo(bot.entity.position) - b.distanceTo(bot.entity.position)
     })
 
-    const nombresBloques = todosLosBloques.slice(0, 15).map(pos => {
+    const nombresBloques = todosLosBloques.slice(0, 20).map(pos => {
         const b = bot.blockAt(pos)
         let nombre = b.name
         if (nombre.includes('ladder')) nombre = 'ESCALERA'
@@ -54,7 +54,7 @@ function escanearEntorno(bot) {
         const relY = pos.y - Math.floor(bot.entity.position.y)
         const alturaStr = relY > 0 ? `+${relY}` : relY < 0 ? `${relY}` : "nivel"
         
-        return `${nombre}(${pos.x},${pos.y},${pos.z},${alturaStr})`
+        return `${nombre}(x:${pos.x},y:${pos.y},z:${pos.z},${alturaStr})`
     })
 
     let vision = ""
