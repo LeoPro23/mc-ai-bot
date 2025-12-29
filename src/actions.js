@@ -44,6 +44,15 @@ async function atacarEntidad(bot, nombre) {
 
     bot.chat(`¡Atacando a ${entity.name || entity.username}!`)
     bot.pvp.attack(entity)
+
+    // Esperar a que la entidad muera o desaparezca
+    const checkInterval = setInterval(() => {
+        if (!entity || !entity.isValid || entity.health <= 0) {
+            bot.chat(`He terminado con ${entity.name || entity.username || nombre}.`)
+            bot.pvp.stop()
+            clearInterval(checkInterval)
+        }
+    }, 1000)
 }
 
 async function construirBloque(bot, tipo, x, y, z) {
