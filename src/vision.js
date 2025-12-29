@@ -1,12 +1,18 @@
 function escanearEntorno(bot) {
     const entidades = Object.values(bot.entities)
-        .filter(e => e.position.distanceTo(bot.entity.position) < 12 && e.username !== bot.username)
+        .filter(e => e.position.distanceTo(bot.entity.position) < 12 && e.id !== bot.entity.id)
         .map(e => {
             const dist = Math.floor(e.position.distanceTo(bot.entity.position))
-            if (e.type === 'player') return `Jugador:${e.username}(${dist}m)`
-            if (e.name) return `${e.name}(${dist}m)`
-            return null
-        }).filter(Boolean).slice(0, 8)
+            const nombre = e.username || e.name || e.displayName || (e.mobType ? e.mobType : e.type)
+            
+            if (!nombre || nombre === 'player') return null
+            
+            const categoria = (e.type === 'player') ? 'Jugador' : 
+                              (e.type === 'mob') ? 'Mob' : 
+                              (e.type === 'passive' || e.type === 'animal') ? 'Animal' : 'Entidad'
+            
+            return `${categoria}:${nombre}(${dist}m)`
+        }).filter(Boolean).slice(0, 12)
 
     // 1. Bloques de Navegación (Prioridad: Escaleras, Puertas)
     const bloquesNavegacion = bot.findBlocks({

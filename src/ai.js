@@ -25,7 +25,8 @@ REGLAS DE ORO (SEGURIDAD Y JERARQUÍA):
 13. VERTICALIDAD: Usa "ESCALERA(Base:... | Top:...)" para subir/bajar.
 14. Si te regañan, pide perdón. Describe la VISION sin dar coordenadas numéricas.
 15. Si no ves una entidad en la VISION, no asumas que ha muerto, simplemente di que no la ves cerca.
-16. Los aldeanos, animales y monstruos aparecen en la VISION por su nombre. Si ves uno, puedes interactuar con él.`
+16. Reporta TODAS las entidades que veas (aldeanos, animales, mobs), no solo las hostiles.
+17. Si el usuario pregunta por "no hostiles", se refiere a aldeanos, animales o jugadores amigos.`
 
 async function initAI() {
     if (USE_GROQ && GROQ_API_KEY) {
