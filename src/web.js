@@ -1,8 +1,10 @@
 const http = require('http')
-const { MODELO_A_USAR, USE_OLLAMA, OLLAMA_MODEL } = require('./config')
+const { MODELO_A_USAR, USE_OLLAMA, OLLAMA_MODEL, USE_GROQ, GROQ_MODEL } = require('./config')
 
 function startWebServer() {
-    const modeloActual = USE_OLLAMA ? `OLLAMA (${OLLAMA_MODEL})` : `GOOGLE (${MODELO_A_USAR})`
+    let modeloActual = `GOOGLE (${MODELO_A_USAR})`
+    if (USE_GROQ) modeloActual = `GROQ (${GROQ_MODEL})`
+    else if (USE_OLLAMA) modeloActual = `OLLAMA (${OLLAMA_MODEL})`
     
     const webServer = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/plain' })

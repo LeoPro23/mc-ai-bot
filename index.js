@@ -88,17 +88,17 @@ function initBot() {
         log(`⚡ PROCESANDO de ${usuario}: "${mensaje}"`)
         
         const p = bot.entity.position
-        const botPos = `x:${Math.floor(p.x)} y:${Math.floor(p.y)} z:${Math.floor(p.z)}`
+        const botPos = `x:${Math.floor(p.x)},y:${Math.floor(p.y)},z:${Math.floor(p.z)}`
         
         const target = Object.values(bot.players).find(p => p.username && p.username.includes('SrLeonardo'))?.entity
-        let infoDueño = target ? `Dueño en: x:${Math.floor(target.position.x)} y:${Math.floor(target.position.y)} z:${Math.floor(target.position.z)}` : "Dueño lejos/oculto."
+        let infoDueño = target ? `Dueño en:x:${Math.floor(target.position.x)},y:${Math.floor(target.position.y)},z:${Math.floor(target.position.z)}` : "Dueño:?"
         
         const entorno = escanearEntorno(bot)
 
         chatHistory.push(`SrLeonardo: ${mensaje}`)
         if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
 
-        const prompt = `Pos:${botPos}. ${infoDueño}. Cerca:${entorno}. Historial:${chatHistory.join(' | ')}. Mensaje:${mensaje}. Respuesta:`
+        const prompt = `Pos:${botPos}. ${infoDueño}. Vision:${entorno}. Historial:${chatHistory.join(' | ')}. Mensaje:${mensaje}`
 
         try {
             const response = await generateResponse(prompt)
