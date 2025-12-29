@@ -74,7 +74,7 @@ function setupAwareness(bot) {
                 if (e.username === 'SrLeonardo') return false // Never blame owner for auto-defense
 
                 const dist = e.position.distanceTo(bot.entity.position)
-                return dist < 5
+                return dist < 16
             })
 
             if (candidate) {
