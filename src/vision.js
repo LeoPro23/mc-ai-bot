@@ -34,18 +34,42 @@ function escanearEntorno(bot) {
         const highest = ladders.reduce((prev, current) => (prev.y > current.y) ? prev : current)
         const lowest = ladders.reduce((prev, current) => (prev.y < current.y) ? prev : current)
         
-        // Encontrar punto de aproximación (bloque de aire frente a la base)
+        // Encontrar punto de aproximación en el SUELO delante de la base.
+        // Si la escalera empieza en el aire (y+1), el bot debe pararse en y-1 y saltar.
         const neighbors = [
-            {x:1, z:0}, {x:-1, z:0}, {x:0, z:1}, {x:0, z:-1}
+            { x: 1, z: 0 },
+            { x: -1, z: 0 },
+            { x: 0, z: 1 },
+            { x: 0, z: -1 }
         ]
-        let approach = lowest
+
+        let approach = null
         for (const n of neighbors) {
-            const p = lowest.offset(n.x, 0, n.z)
-            if (bot.blockAt(p).name === 'air') {
+            const p = lowest.offset(n.x, -1, n.z)
+            const below = p.offset(0, -1, 0)
+            const blockAtP = bot.blockAt(p)
+            const blockBelow = bot.blockAt(below)
+            if (blockAtP && blockBelow && blockAtP.name === 'air' && blockBelow.name !== 'air') {
                 approach = p
                 break
             }
         }
+
+        // Fallback: si la escalera sí toca el suelo, usa y=lowest.y
+        if (!approach) {
+            for (const n of neighbors) {
+                const p = lowest.offset(n.x, 0, n.z)
+                const below = p.offset(0, -1, 0)
+                const blockAtP = bot.blockAt(p)
+                const blockBelow = bot.blockAt(below)
+                if (blockAtP && blockBelow && blockAtP.name === 'air' && blockBelow.name !== 'air') {
+                    approach = p
+                    break
+                }
+            }
+        }
+
+        if (!approach) approach = lowest
         
         ladderInfo = `ESCALERA(Aproximar:x:${approach.x},y:${approach.y},z:${approach.z} | Top:x:${highest.x},y:${highest.y+1},z:${highest.z}). `
     }
