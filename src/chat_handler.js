@@ -350,6 +350,13 @@ function setupChat(bot, isEatingFn) {
             console.log('⚡ Auto-aceptando TP de SrLeonardo...')
             bot.chat('/tpaccept')
         }
+
+        // FREEZE ON TELEPORT (Fixes "fighting" the TP)
+        if (msg.includes('Teleporting...')) {
+            console.log('🛑 Teletransporte detectado. Deteniendo pathfinding.')
+            try { bot.pathfinder.setGoal(null) } catch { }
+            stopFollow(bot)
+        }
     })
 }
 

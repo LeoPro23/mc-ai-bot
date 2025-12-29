@@ -9,6 +9,7 @@ function requestTeleportTo(bot, playerName) {
         return
     }
     lastTpaAt = now
+    try { bot.pathfinder.setGoal(null) } catch { }
     bot.chat(`/tpa ${playerName}`)
     bot.chat('Te envié solicitud de TP. Acepta (normalmente /tpaccept).')
 }
