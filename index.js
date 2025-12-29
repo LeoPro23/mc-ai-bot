@@ -8,6 +8,8 @@ const { startWebServer } = require('./src/web')
 const { escanearEntorno } = require('./src/vision')
 const { irYRomper, atacarEntidad, construirBloque, construirEstructura, stopBuilding, construirCamino, escanearEstructura, clonarEstructura } = require('./src/actions')
 const { initAI, generateResponse } = require('./src/ai')
+const { setCombatMode, combatTick, notifyOwner } = require('./src/combat')
+const { askOwnerDecision, handleOwnerResponse, requestTeleportTo, clearPendingDecision } = require('./src/interaction')
 
 // Función para logs con hora
 function log(msg) {
@@ -51,42 +53,10 @@ function initBot() {
     let lastNoPathAt = 0
     let lastRescueAt = 0
 
-    // Flujo de aprobación del dueño (cuando no hay camino / está atascado)
-    let pendingDecision = null
-
-    function clearPendingDecision() {
-        pendingDecision = null
-    }
-
-    function requestTeleportTo(playerName) {
-        if (!playerName) playerName = 'SrLeonardo'
-        bot.chat(`/tpa ${playerName}`)
-        bot.chat('Te envié solicitud de TP. Acepta (normalmente /tpaccept).')
-    }
-
-    function askOwnerDecision(reason, opts = {}) {
-        const now = Date.now()
-        if (pendingDecision && pendingDecision.expiresAt > now) return
-
-        pendingDecision = {
-            reason,
-            action: opts.action || null,
-            targetName: opts.targetName || null,
-            createdAt: now,
-            expiresAt: now + 30000
-        }
-
-        bot.chat(
-            'No hay camino claro para llegar a ti. ¿Qué hago? ' +
-            '1) Reintento seguirte, 2) Me quedo quieto y reintento, 3) Pido TP con /tpa. ' +
-            'También puedes responder OK para que ejecute la opción recomendada. ' +
-            'Si quieres que haga un rescate con picar/construir, responde: AUTORIZO RESCATE (30s).'
-        )
-    }
-
     function stopFollow() {
         following = false
         lastFollowDist = null
+        try { clearPendingDecision() } catch {}
         try { bot.pathfinder.setGoal(null) } catch {}
     }
 
@@ -95,7 +65,7 @@ function initBot() {
         const targetEntity = bot.players[username]?.entity
         if (!targetEntity) {
             bot.chat('No te veo cerca. Puedo pedir TP (#tpa) para llegar. ¿Procedo? Responde OK o 3.')
-            askOwnerDecision('not_visible', { action: 'tpa', targetName: username })
+            askOwnerDecision(bot, 'not_visible', { action: 'tpa', targetName: username })
             return
         }
         following = true
@@ -302,6 +272,15 @@ function initBot() {
     bot.on('physicsTick', () => {
         tickCounter++
         if (tickCounter % 10 !== 0) return // cada ~0.5s
+
+        // Watchdog combate (cada ~0.5s)
+        try {
+            combatTick(bot, following, () => {
+                following = true
+                followTargetName = 'SrLeonardo'
+            })
+        } catch {}
+
         if (!following) return
 
         const target = bot.players[followTargetName]?.entity
@@ -362,7 +341,7 @@ function initBot() {
             return
         }
 
-        askOwnerDecision(noPathRecently ? 'noPath' : 'stuck')
+        askOwnerDecision(bot, noPathRecently ? 'noPath' : 'stuck')
     })
 
   async function procesarMensaje(usuario, mensaje, fuente) {
@@ -372,46 +351,20 @@ function initBot() {
     const msgLower = mensaje.toLowerCase()
 
     // Resolver decisiones pendientes del dueño (ideal para /r o /msg)
-    if (esDueño && pendingDecision && pendingDecision.expiresAt > Date.now()) {
-        if (/^\s*(ok|okay|si|sí|dale|procede|proceder)\s*$/i.test(mensaje)) {
-            const action = pendingDecision.action
-            const targetName = pendingDecision.targetName || followTargetName
-            clearPendingDecision()
-            if (action === 'tpa') {
-                requestTeleportTo(targetName)
-                return
+    if (esDueño) {
+        const handled = handleOwnerResponse(
+            bot,
+            mensaje,
+            followTargetName,
+            () => {
+                const t = bot.players[followTargetName]?.entity
+                if (t) {
+                    following = true
+                    bot.pathfinder.setGoal(new goals.GoalFollow(t, 1), true)
+                }
             }
-            bot.chat('Ok.')
-            return
-        }
-        if (/^\s*(cancelar|cancela|no)\s*$/i.test(mensaje)) {
-            clearPendingDecision()
-            bot.chat('Ok, cancelado.')
-            return
-        }
-        if (/^\s*1\s*$/i.test(mensaje) || /reintento/i.test(mensaje)) {
-            clearPendingDecision()
-            bot.chat('Reintentando...')
-            const t = bot.players[followTargetName]?.entity
-            if (t) bot.pathfinder.setGoal(new goals.GoalFollow(t, 1), true)
-            return
-        }
-        if (/^\s*2\s*$/i.test(mensaje) || /quieto|espera/i.test(mensaje)) {
-            clearPendingDecision()
-            bot.chat('Ok, me quedo aquí y vuelvo a intentar en breve.')
-            return
-        }
-        if (/^\s*3\s*$/i.test(mensaje) || /(tpa|tp)/i.test(mensaje)) {
-            const targetName = pendingDecision.targetName || followTargetName
-            clearPendingDecision()
-            requestTeleportTo(targetName)
-            return
-        }
-        if (/autorizo\s+rescate/i.test(mensaje)) {
-            clearPendingDecision()
-            bot.chat('Recibido. Para evitar romper/construir por error, dime exactamente qué hacer con un comando # (por ejemplo #MINE, #BUILD, #HOUSE, #PATH).')
-            return
-        }
+        )
+        if (handled) return
     }
 
     // COMANDO DE EMERGENCIA (Solo Dueño)
@@ -431,9 +384,24 @@ function initBot() {
                 startFollow('SrLeonardo')
                 return
             }
+            if (/(^|\b)(modo\s+guerra|war\s+mode|guerra\s+on)\b/i.test(mensaje)) {
+                setCombatMode(bot, { enabled: true, assistOwner: true, guardOwner: true })
+                notifyOwner(bot, 'Modo guerra activado: guardia + asistencia (solo mobs hostiles).')
+                return
+            }
+            if (/(^|\b)(guerra\s+off|modo\s+guerra\s+off|war\s+off)\b/i.test(mensaje)) {
+                setCombatMode(bot, { enabled: false, assistOwner: false, guardOwner: false, focusQuery: null })
+                notifyOwner(bot, 'Modo guerra desactivado.')
+                return
+            }
+            const focusMsg = mensaje.match(/\b(focus|enfoca)\s+(.+)$/i)
+            if (focusMsg && focusMsg[2]) {
+                setCombatMode(bot, { enabled: true, assistOwner: true, guardOwner: true, focusQuery: focusMsg[2].trim() })
+                notifyOwner(bot, `Focus: ${focusMsg[2].trim()}`)
+                return
+            }
             if (/(^|\b)(haz\s+)?tpa\b/i.test(mensaje) || /\b(no\s+hay\s+camino|tepe|tp)\b/i.test(mensaje)) {
-                bot.chat(`/tpa ${usuario}`)
-                bot.chat('Te envié solicitud de TP. Acepta (normalmente /tpaccept).')
+                requestTeleportTo(bot, usuario)
                 return
             }
             if (/(^|\b)(sube|subelas|usa las escaleras|escalera)\b/i.test(mensaje) && !/(\d+)/.test(mensaje)) {
@@ -498,18 +466,69 @@ MENSAJE: "${mensaje}"`
 
             // 2. Ejecutar Comandos (SOLO SI ES EL DUEÑO)
             if (esDueño) {
+                // #WAR ON/OFF (modo guerra)
+                if (response.includes('#WAR')) {
+                    const m = response.match(/#WAR\s+(ON|OFF)/i)
+                    if (m && m[1] && m[1].toUpperCase() === 'ON') {
+                        setCombatMode(bot, { enabled: true, assistOwner: true, guardOwner: true })
+                        notifyOwner(bot, 'Modo guerra activado.')
+                    } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
+                        setCombatMode(bot, { enabled: false, assistOwner: false, guardOwner: false, focusQuery: null })
+                        notifyOwner(bot, 'Modo guerra desactivado.')
+                    }
+                }
+
+                // #ASSIST ON/OFF
+                if (response.includes('#ASSIST')) {
+                    const m = response.match(/#ASSIST\s+(ON|OFF)/i)
+                    if (m && m[1] && m[1].toUpperCase() === 'ON') {
+                        setCombatMode(bot, { enabled: true, assistOwner: true })
+                        notifyOwner(bot, 'Asistencia activada (solo mobs hostiles).')
+                    } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
+                        setCombatMode(bot, { assistOwner: false })
+                        notifyOwner(bot, 'Asistencia desactivada.')
+                    }
+                }
+
+                // #GUARD ON/OFF
+                if (response.includes('#GUARD')) {
+                    const m = response.match(/#GUARD\s+(ON|OFF)/i)
+                    if (m && m[1] && m[1].toUpperCase() === 'ON') {
+                        setCombatMode(bot, { enabled: true, guardOwner: true })
+                        notifyOwner(bot, 'Guardia activada (me quedo cerca de ti).')
+                    } else if (m && m[1] && m[1].toUpperCase() === 'OFF') {
+                        setCombatMode(bot, { guardOwner: false })
+                        notifyOwner(bot, 'Guardia desactivada.')
+                    }
+                }
+
+                // #FOCUS query
+                if (response.includes('#FOCUS')) {
+                    const m = response.match(/#FOCUS\s+([^#\n\r]+)/i)
+                    if (m && m[1]) {
+                        setCombatMode(bot, { enabled: true, assistOwner: true, guardOwner: true, focusQuery: m[1].trim() })
+                        notifyOwner(bot, `Focus: ${m[1].trim()}`)
+                    }
+                }
+
+                // #UNFOCUS
+                if (response.includes('#UNFOCUS')) {
+                    setCombatMode(bot, { focusQuery: null })
+                    notifyOwner(bot, 'Focus limpiado.')
+                }
+
                 // #ASK_TP (propuesta de teleport con aprobación)
                 if (response.includes('#ASK_TP')) {
                     const m = response.match(/#ASK_TP\s+(\w+)?/i)
                     const targetName = (m && m[1]) ? m[1] : 'SrLeonardo'
-                    askOwnerDecision('ai_ask_tp', { action: 'tpa', targetName })
+                    askOwnerDecision(bot, 'ai_ask_tp', { action: 'tpa', targetName })
                 }
 
                 // #TPA (ejecuta solicitud /tpa directamente)
                 if (response.includes('#TPA')) {
                     const m = response.match(/#TPA\s+(\w+)?/i)
                     const targetName = (m && m[1]) ? m[1] : 'SrLeonardo'
-                    requestTeleportTo(targetName)
+                    requestTeleportTo(bot, targetName)
                 }
 
                 // #FOLLOW
