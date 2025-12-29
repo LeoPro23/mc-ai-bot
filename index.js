@@ -46,6 +46,10 @@ function initBot() {
     log(`🚀 ${bot.username} conectado.`)
     if (MC_AUTH_PASS) bot.chat(`/login ${MC_AUTH_PASS}`)
     
+    // Configuración de Pathfinder
+    bot.pathfinder.thinkTimeout = 5000 // Más tiempo para pensar caminos complejos
+    bot.pathfinder.tickTimeout = 100
+    
     try {
         const mcData = require('minecraft-data')(bot.version)
         const defaultMove = new Movements(bot, mcData)
@@ -56,6 +60,7 @@ function initBot() {
         defaultMove.allowParkour = true 
         defaultMove.canOpenDoors = true
         defaultMove.canOpenGates = true
+        defaultMove.allowSprinting = true
         
         bot.pathfinder.setMovements(defaultMove)
     } catch (e) {}
@@ -64,7 +69,12 @@ function initBot() {
   // DIAGNÓSTICO DE PATHFINDER
   bot.on('path_update', (r) => {
     if (r.status === 'noPath') {
-        bot.chat("No encuentro camino para llegar ahí.")
+        if (bot.pathfinder.goal) {
+            const msg = "No encuentro camino para llegar ahí."
+            bot.chat(msg)
+            chatHistory.push(`Pollovis: ${msg}`)
+            if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
+        }
     }
   })
 
@@ -114,46 +124,58 @@ MENSAJE DE SRLEONARDO: "${mensaje}"`
             const response = await generateResponse(prompt)
             log(`💬 IA: ${response}`)
 
-            chatHistory.push(`Pollovis: ${response.replace(/#.*/, '').trim()}`)
+            // 1. Extraer y limpiar el mensaje de texto (sin comandos #)
+            const textoLimpio = response.replace(/#\w+.*?(\s|$)/g, '').trim()
+            if (textoLimpio) {
+                bot.chat(textoLimpio.replace(/\n/g, ' '))
+                chatHistory.push(`Pollovis: ${textoLimpio}`)
+            }
 
-            // Lógica de Comandos
+            // 2. Ejecutar Comandos (pueden ser varios)
+            
+            // #GOTO
             if (response.includes('#GOTO')) {
                 const match = response.match(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                    const chatMsg = response.replace(/#GOTO.*/, '').trim()
-                    if(chatMsg) bot.chat(chatMsg.replace(/\n/g, ' '))
-                    bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
+                    bot.pathfinder.setGoal(new goals.GoalNear(x, y, z, 1))
                 }
             } 
-            else if (response.includes('#MINE')) {
+            
+            // #MINE
+            if (response.includes('#MINE')) {
                 const match = response.match(/#MINE\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
                 if (match) {
                     const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                    const chatMsg = response.replace(/#MINE.*/, '').trim()
-                    if(chatMsg) bot.chat(chatMsg.replace(/\n/g, ' '))
                     irYRomper(bot, x, y, z)
                 }
             }
-            else if (response.includes('#KILL')) {
+
+            // #KILL
+            if (response.includes('#KILL')) {
                 const match = response.match(/#KILL\s+(\w+)/i)
                 if (match) {
-                    const targetName = match[1]
-                    atacarEntidad(bot, targetName)
+                    atacarEntidad(bot, match[1])
                 }
             }
-            else if (response.includes('#BUILD')) {
+
+            // #BUILD
+            if (response.includes('#BUILD')) {
                 const match = response.match(/#BUILD\s+(\w+)\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
                 if (match) {
                     const tipo = match[1], x = parseInt(match[2]), y = parseInt(match[3]), z = parseInt(match[4])
                     construirBloque(bot, tipo, x, y, z)
                 }
             }
-            else if (response.includes('#HOUSE')) {
+
+            // #HOUSE
+            if (response.includes('#HOUSE')) {
                 const p = bot.entity.position
                 construirEstructura(bot, 'casa', Math.floor(p.x) + 1, Math.floor(p.y), Math.floor(p.z) + 1)
             }
-            else if (response.includes('#PATH')) {
+
+            // #PATH
+            if (response.includes('#PATH')) {
                 const match = response.match(/#PATH\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\w+)/i)
                 if (match) {
                     const x1 = parseInt(match[1]), y1 = parseInt(match[2]), z1 = parseInt(match[3])
@@ -162,15 +184,17 @@ MENSAJE DE SRLEONARDO: "${mensaje}"`
                     construirCamino(bot, x1, y1, z1, x2, y2, z2, tipo)
                 }
             }
-            else if (response.includes('#SCAN')) {
-                escanearEstructura(bot, 5) // Radio de 5 bloques por defecto
+
+            // #SCAN
+            if (response.includes('#SCAN')) {
+                escanearEstructura(bot, 5)
             }
-            else if (response.includes('#CLONE')) {
+
+            // #CLONE
+            if (response.includes('#CLONE')) {
                 clonarEstructura(bot)
             }
-            else {
-                bot.chat(response.replace(/\n/g, ' | '))
-            }
+
         } catch (e) { 
             log(`❌ Error API: ${e.message}`)
             bot.chat("Error cerebral.")
@@ -189,6 +213,21 @@ MENSAJE DE SRLEONARDO: "${mensaje}"`
   })
 
   bot.on('error', (e) => log(`Error: ${e}`))
+  
+  // AUTO-COMER
+  bot.on('health', () => {
+    if (bot.food < 15) {
+        const food = bot.inventory.items().find(item => {
+            const data = require('minecraft-data')(bot.version).foodsByName[item.name]
+            return data !== undefined
+        })
+        if (food) {
+            bot.equip(food, 'hand')
+            bot.consume()
+        }
+    }
+  })
+
   bot.on('end', () => {
     log('Desconectado. Reconectando...')
     setTimeout(initBot, 10000)

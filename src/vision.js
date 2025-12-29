@@ -44,12 +44,17 @@ function escanearEntorno(bot) {
         return a.distanceTo(bot.entity.position) - b.distanceTo(bot.entity.position)
     })
 
-    const nombresBloques = todosLosBloques.slice(0, 12).map(pos => {
+    const nombresBloques = todosLosBloques.slice(0, 15).map(pos => {
         const b = bot.blockAt(pos)
         let nombre = b.name
         if (nombre.includes('ladder')) nombre = 'ESCALERA'
         if (nombre.includes('stairs')) nombre = 'ESCALON'
-        return `${nombre}(${pos.x},${pos.y},${pos.z})`
+        
+        // Añadir indicador de altura relativa
+        const relY = pos.y - Math.floor(bot.entity.position.y)
+        const alturaStr = relY > 0 ? `+${relY}` : relY < 0 ? `${relY}` : "nivel"
+        
+        return `${nombre}(${pos.x},${pos.y},${pos.z},${alturaStr})`
     })
 
     let vision = ""
