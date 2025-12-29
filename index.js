@@ -86,12 +86,11 @@ function initBot() {
   async function procesarMensaje(usuario, mensaje, fuente) {
     if (usuario === bot.username) return
     
-    // FILTRO ESTRICTO: Solo SrLeonardo
-    if (!usuario.includes('SrLeonardo')) return 
-
-    // COMANDO DE EMERGENCIA
+    const esDueño = usuario.includes('SrLeonardo')
     const msgLower = mensaje.toLowerCase()
-    if (msgLower === 'para' || msgLower === 'stop' || msgLower === 'quieto') {
+
+    // COMANDO DE EMERGENCIA (Solo Dueño)
+    if (esDueño && (msgLower === 'para' || msgLower === 'stop' || msgLower === 'quieto')) {
         bot.pathfinder.setGoal(null)
         bot.stopDigging()
         bot.pvp.stop()
@@ -104,7 +103,7 @@ function initBot() {
     const esPrivado = fuente === 'whisper' || mensaje.includes('-> me')
 
     if (mencionaBot || esPrivado) {
-        log(`⚡ PROCESANDO de ${usuario}: "${mensaje}"`)
+        log(`⚡ PROCESANDO de ${usuario} (${esDueño ? 'Dueño' : 'Invitado'}): "${mensaje}"`)
         
         const p = bot.entity.position
         const botPos = `x:${Math.floor(p.x)},y:${Math.floor(p.y)},z:${Math.floor(p.z)}`
@@ -114,7 +113,7 @@ function initBot() {
         
         const entorno = escanearEntorno(bot)
 
-        chatHistory.push(`SrLeonardo: ${mensaje}`)
+        chatHistory.push(`${usuario}: ${mensaje}`)
         if (chatHistory.length > MAX_HISTORY) chatHistory.shift()
 
         const prompt = `ESTADO ACTUAL:
@@ -123,7 +122,8 @@ function initBot() {
 - Visión: ${entorno}
 - Historial reciente: ${chatHistory.join(' | ')}
 
-MENSAJE DE SRLEONARDO: "${mensaje}"`
+USUARIO ACTUAL: ${usuario} (${esDueño ? 'ES EL DUEÑO' : 'NO ES EL DUEÑO'})
+MENSAJE: "${mensaje}"`
 
         try {
             const response = await generateResponse(prompt)
@@ -134,7 +134,6 @@ MENSAJE DE SRLEONARDO: "${mensaje}"`
             
             // SEGURIDAD: Eliminar cualquier patrón de coordenadas (3 números seguidos) para no exponer la base
             textoLimpio = textoLimpio.replace(/-?\d+[,\s]+-?\d+[,\s]+-?\d+/g, '').trim()
-            // Eliminar comas o puntos que hayan quedado sueltos al principio tras borrar las coordenadas
             textoLimpio = textoLimpio.replace(/^[,.\s]+/, '')
 
             if (textoLimpio) {
@@ -142,69 +141,71 @@ MENSAJE DE SRLEONARDO: "${mensaje}"`
                 chatHistory.push(`Pollovis: ${textoLimpio}`)
             }
 
-            // 2. Ejecutar Comandos (pueden ser varios)
-            
-            // #GOTO
-            if (response.includes('#GOTO')) {
-                const match = response.match(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
-                if (match) {
-                    const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                    // Usamos GoalBlock para que intente llegar EXACTAMENTE al punto (importante para escaleras)
-                    bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
+            // 2. Ejecutar Comandos (SOLO SI ES EL DUEÑO)
+            if (esDueño) {
+                // #GOTO
+                if (response.includes('#GOTO')) {
+                    const match = response.match(/#GOTO\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
+                    if (match) {
+                        const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
+                        bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z))
+                    }
+                } 
+                
+                // #MINE
+                if (response.includes('#MINE')) {
+                    const match = response.match(/#MINE\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
+                    if (match) {
+                        const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
+                        irYRomper(bot, x, y, z)
+                    }
                 }
-            } 
-            
-            // #MINE
-            if (response.includes('#MINE')) {
-                const match = response.match(/#MINE\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
-                if (match) {
-                    const x = parseInt(match[1]), y = parseInt(match[2]), z = parseInt(match[3])
-                    irYRomper(bot, x, y, z)
+
+                // #KILL
+                if (response.includes('#KILL')) {
+                    const match = response.match(/#KILL\s+(\w+)/i)
+                    if (match) {
+                        atacarEntidad(bot, match[1])
+                    }
                 }
-            }
 
-            // #KILL
-            if (response.includes('#KILL')) {
-                const match = response.match(/#KILL\s+(\w+)/i)
-                if (match) {
-                    atacarEntidad(bot, match[1])
+                // #BUILD
+                if (response.includes('#BUILD')) {
+                    const match = response.match(/#BUILD\s+(\w+)\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
+                    if (match) {
+                        const tipo = match[1], x = parseInt(match[2]), y = parseInt(match[3]), z = parseInt(match[4])
+                        construirBloque(bot, tipo, x, y, z)
+                    }
                 }
-            }
 
-            // #BUILD
-            if (response.includes('#BUILD')) {
-                const match = response.match(/#BUILD\s+(\w+)\s+(?:x:)?\s*(-?\d+)[,\s]+(?:y:)?\s*(-?\d+)[,\s]+(?:z:)?\s*(-?\d+)/i)
-                if (match) {
-                    const tipo = match[1], x = parseInt(match[2]), y = parseInt(match[3]), z = parseInt(match[4])
-                    construirBloque(bot, tipo, x, y, z)
+                // #HOUSE
+                if (response.includes('#HOUSE')) {
+                    const p = bot.entity.position
+                    construirEstructura(bot, 'casa', Math.floor(p.x) + 1, Math.floor(p.y), Math.floor(p.z) + 1)
                 }
-            }
 
-            // #HOUSE
-            if (response.includes('#HOUSE')) {
-                const p = bot.entity.position
-                construirEstructura(bot, 'casa', Math.floor(p.x) + 1, Math.floor(p.y), Math.floor(p.z) + 1)
-            }
-
-            // #PATH
-            if (response.includes('#PATH')) {
-                const match = response.match(/#PATH\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\w+)/i)
-                if (match) {
-                    const x1 = parseInt(match[1]), y1 = parseInt(match[2]), z1 = parseInt(match[3])
-                    const x2 = parseInt(match[4]), y2 = parseInt(match[5]), z2 = parseInt(match[6])
-                    const tipo = match[7]
-                    construirCamino(bot, x1, y1, z1, x2, y2, z2, tipo)
+                // #PATH
+                if (response.includes('#PATH')) {
+                    const match = response.match(/#PATH\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\w+)/i)
+                    if (match) {
+                        const x1 = parseInt(match[1]), y1 = parseInt(match[2]), z1 = parseInt(match[3])
+                        const x2 = parseInt(match[4]), y2 = parseInt(match[5]), z2 = parseInt(match[6])
+                        const tipo = match[7]
+                        construirCamino(bot, x1, y1, z1, x2, y2, z2, tipo)
+                    }
                 }
-            }
 
-            // #SCAN
-            if (response.includes('#SCAN')) {
-                escanearEstructura(bot, 5)
-            }
+                // #SCAN
+                if (response.includes('#SCAN')) {
+                    escanearEstructura(bot, 5)
+                }
 
-            // #CLONE
-            if (response.includes('#CLONE')) {
-                clonarEstructura(bot)
+                // #CLONE
+                if (response.includes('#CLONE')) {
+                    clonarEstructura(bot)
+                }
+            } else if (response.includes('#')) {
+                log(`⚠️ Intento de comando bloqueado para usuario: ${usuario}`)
             }
 
         } catch (e) { 
