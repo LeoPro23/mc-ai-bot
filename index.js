@@ -166,7 +166,7 @@ function initBot() {
         bot.setControlState('forward', false)
     }
 
-    async function climbNearestLadder() {
+    async function climbNearestLadder(silent = false) {
         const ladderPositions = bot.findBlocks({
             matching: (block) => block && block.name && block.name.includes('ladder'),
             maxDistance: 16,
@@ -174,7 +174,7 @@ function initBot() {
         })
 
         if (!ladderPositions || ladderPositions.length === 0) {
-            bot.chat('No veo una escalera cerca.')
+            if (!silent) bot.chat('No veo una escalera cerca.')
             return
         }
 
@@ -268,17 +268,23 @@ function initBot() {
         defaultMove.exclusionAreas = [] 
         
         bot.pathfinder.setMovements(defaultMove)
+        bot.pvp.movements = defaultMove // Sync PVP movements for better combat navigation
     } catch (e) {
         log(`❌ Error configurando Movements: ${e.message}`)
     }
   })
 
   // DIAGNÓSTICO DE PATHFINDER
+  let lastNoPathLog = 0
   bot.on('path_update', (r) => {
     if (r.status === 'noPath') {
         if (bot.pathfinder.goal) {
-            log(`⚠️ Pathfinder: No hay ruta clara a ${bot.pathfinder.goal.x}, ${bot.pathfinder.goal.y}, ${bot.pathfinder.goal.z}`)
-                        if (following) lastNoPathAt = Date.now()
+            const now = Date.now()
+            if (now - lastNoPathLog > 5000) { // Debounce 5s
+                log(`⚠️ Pathfinder: No hay ruta clara a ${bot.pathfinder.goal.x}, ${bot.pathfinder.goal.y}, ${bot.pathfinder.goal.z}`)
+                lastNoPathLog = now
+            }
+            if (following) lastNoPathAt = Date.now()
         }
     }
   })
@@ -344,7 +350,7 @@ function initBot() {
             ;(async () => {
                 try {
                     log('🧭 Seguimiento atascado: intentando subir con escalera cercana...')
-                    await climbNearestLadder()
+                    await climbNearestLadder(true) // Silent checking
                 } catch (e) {
                     log(`⚠️ Rescate por escalera falló: ${e.message}`)
                 } finally {
@@ -699,15 +705,26 @@ MENSAJE: "${mensaje}"`
   bot.on('error', (e) => log(`Error: ${e}`))
   
   // AUTO-COMER
-  bot.on('health', () => {
+  let isEating = false
+  bot.on('health', async () => {
+    if (isEating) return
     if (bot.food < 15) {
         const food = bot.inventory.items().find(item => {
             const data = require('minecraft-data')(bot.version).foodsByName[item.name]
             return data !== undefined
         })
         if (food) {
-            bot.equip(food, 'hand')
-            bot.consume()
+            try {
+                isEating = true
+                await bot.equip(food, 'hand')
+                await bot.consume()
+            } catch (err) {
+                 if (err.message !== 'Consuming cancelled due to calling bot.consume() again') {
+                     log(`⚠️ Error comiendo: ${err.message}`)
+                 }
+            } finally {
+                isEating = false
+            }
         }
     }
   })
