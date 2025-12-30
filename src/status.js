@@ -17,8 +17,17 @@ function getStatusReport(bot, following, followTargetName, isEating) {
     let activity = 'Idle'
     if (following) activity = `Siguiendo a ${followTargetName}`
     if (isEating) activity = 'Comiendo 🍗'
+
+    // Check pathfinder goal for cleaner details
+    if (bot.pathfinder.isMoving()) {
+        if (!following) activity = 'Caminando...'
+    }
+
     const target = bot.pvp && bot.pvp.target
     if (target) activity = `⚔️ Peleando con ${target.name || target.username}`
+
+    // TODO: Add mining details if we had global mining state exposed.
+    // For now this is better than before.
 
     // Equipment
     const hand = bot.heldItem ? bot.heldItem.name : 'Mano vacía'

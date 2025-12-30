@@ -46,7 +46,7 @@ function shouldProcessMessage(usuario, mensaje, fuente) {
     const key = `${usuario}:${mensaje}`
     const now = Date.now()
     const last = recentMessages.get(key)
-    if (last && (now - last) < 900) return false
+    if (last && (now - last) < 2000) return false
     recentMessages.set(key, now)
     if (recentMessages.size > 250) {
         for (const [k, t] of recentMessages) {
@@ -131,6 +131,11 @@ async function procesarMensaje(bot, usuario, mensaje, fuente, isEating) {
         if (/(^|\b)(estado|status|reporte)\b/i.test(mensaje)) {
             const report = getStatusReport(bot, following, followTargetName, isEating)
             bot.chat(report)
+            return
+        }
+        if (/(^|\b)(deja de seguir|dejar de seguir|unfollow|stop follow)\b/i.test(mensaje)) {
+            stopFollow(bot)
+            bot.chat('Dejo de seguirte, SrLeonardo.')
             return
         }
     }

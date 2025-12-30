@@ -1,5 +1,6 @@
 let pendingDecision = null
 let lastTpaAt = 0
+let lastAskTime = 0
 
 function requestTeleportTo(bot, playerName) {
     if (!playerName) playerName = 'SrLeonardo'
@@ -29,6 +30,12 @@ function askOwnerDecision(bot, reason, opts = {}) {
         createdAt: now,
         expiresAt: now + 30000
     }
+
+    // SPAM PREVENTION: Don't ask identical questions too often
+    if (now - lastAskTime < 10000) {
+        return
+    }
+    lastAskTime = now
 
     // Mantener mensajes cortos para que el servidor no los parta a mitad de palabra.
     bot.chat('No hay camino claro. Opciones: 1=reintento, 2=espera, 3=pido TP. OK=proceder.')
